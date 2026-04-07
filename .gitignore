@@ -1,0 +1,21 @@
+
+#Ignore cursor AI rules
+.cursor/rules/codacy.mdc
+
+# Dependencies & build
+node_modules/
+.next/
+out/
+dist/
+*.exe
+*.test
+coverage/
+
+# Environment (never commit secrets)
+.env
+.env.*
+!.env.example
+
+# OS / IDE
+.DS_Store
+*.log
