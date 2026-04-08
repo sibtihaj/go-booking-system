@@ -1,3 +1,4 @@
+import { BookingArchitectureDiagrams } from "@/components/booking/booking-architecture-diagrams";
 import { Badge } from "@/components/ui/badge";
 import type { ShowcaseSection } from "@/content/showcase";
 import { cn } from "@/lib/utils";
@@ -61,6 +62,13 @@ export function ShowcaseSectionContent({
       <p className="text-muted-foreground text-sm leading-relaxed">
         {section.summary}
       </p>
+
+      {section.customContent === "booking-architecture" ? (
+        <BookingArchitectureDiagrams
+          className="space-y-8 pt-1"
+          hideSourceFooter
+        />
+      ) : null}
 
       {section.http ? (
         <div className="rounded-lg border border-emerald-500/15 bg-emerald-500/[0.04] px-3 py-2 text-xs">

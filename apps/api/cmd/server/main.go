@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -73,17 +74,22 @@ func main() {
 		os.Exit(1)
 	}
 
-	api := &handlers.API{Pool: pool}
+	api := &handlers.API{
+		Pool:              pool,
+		SlotCreateSecret:  strings.TrimSpace(os.Getenv("SLOT_CREATE_SECRET")),
+		BenchmarkMaxN:     cfg.BenchmarkMaxN,
+		BenchmarkHardMaxN: cfg.BenchmarkHardMaxN,
+		BenchmarkSecret:   cfg.BenchmarkSecret,
+	}
 
 	r := chi.NewRouter()
 	r.Use(middleware.RealIP)
 	r.Use(middleware.RequestID)
 	r.Use(middleware.Recoverer)
-	r.Use(middleware.Timeout(cfg.RequestTimeout))
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   cfg.CORSAllowedOrigins,
 		AllowedMethods:   []string{"GET", "POST", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-Slot-Admin-Key", "X-Benchmark-Key"},
 		AllowCredentials: true,
 		MaxAge:           300,
 	}))
@@ -91,8 +97,18 @@ func main() {
 	r.Get("/health", api.Health)
 
 	r.Route("/api/v1", func(r chi.Router) {
-		r.With(verifier.Middleware).Get("/availability", api.Availability)
-		r.With(verifier.Middleware).Post("/reservations", api.CreateReservation)
+		r.Group(func(r chi.Router) {
+			r.Use(middleware.Timeout(cfg.RequestTimeout))
+			r.With(verifier.Middleware).Get("/db-status", api.DBStatus)
+			r.With(verifier.Middleware).Get("/availability", api.Availability)
+			r.With(verifier.Middleware).Get("/reservations", api.ListMyReservations)
+			r.With(verifier.Middleware).Post("/reservations", api.CreateReservation)
+			r.With(verifier.Middleware).Post("/slots", api.CreateSlot)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(middleware.Timeout(5 * time.Minute))
+			r.With(verifier.Middleware).Post("/benchmark/booking-rush", api.BenchmarkBookingRush)
+		})
 	})
 
 	srv := &http.Server{

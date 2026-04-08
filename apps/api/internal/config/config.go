@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -18,6 +19,9 @@ type Config struct {
 	DBMaxConnLifetime   time.Duration
 	DBMaxConnIdleTime   time.Duration
 	RequestTimeout      time.Duration
+	BenchmarkMaxN       int
+	BenchmarkHardMaxN   int
+	BenchmarkSecret     string
 }
 
 // Load reads configuration from environment variables with sensible defaults for local dev.
@@ -60,15 +64,46 @@ func Load() (*Config, error) {
 		addr = ":" + addr
 	}
 
+	dbMax := int32(10)
+	if raw := strings.TrimSpace(os.Getenv("DB_MAX_CONNS")); raw != "" {
+		if v, err := strconv.Atoi(raw); err == nil && v > 0 && v <= 500 {
+			dbMax = int32(v)
+		}
+	}
+
+	benchMax := 10000
+	if raw := strings.TrimSpace(os.Getenv("BENCHMARK_MAX_N")); raw != "" {
+		if v, err := strconv.Atoi(raw); err == nil && v > 0 {
+			benchMax = v
+		}
+	}
+
+	benchHard := 10000
+	if raw := strings.TrimSpace(os.Getenv("BENCHMARK_HARD_MAX_N")); raw != "" {
+		if v, err := strconv.Atoi(raw); err == nil && v > 0 {
+			benchHard = v
+		}
+	}
+
+	reqTimeout := 15 * time.Second
+	if raw := strings.TrimSpace(os.Getenv("REQUEST_TIMEOUT")); raw != "" {
+		if d, err := time.ParseDuration(raw); err == nil && d > 0 {
+			reqTimeout = d
+		}
+	}
+
 	return &Config{
 		Addr:               addr,
 		DatabaseURL:        dbURL,
 		SupabaseJWTIssuer:  issuer,
 		CORSAllowedOrigins: origins,
-		DBMaxConns:         10,
+		DBMaxConns:         dbMax,
 		DBMinConns:         0,
 		DBMaxConnLifetime:  time.Hour,
 		DBMaxConnIdleTime:  30 * time.Minute,
-		RequestTimeout:     15 * time.Second,
+		RequestTimeout:     reqTimeout,
+		BenchmarkMaxN:      benchMax,
+		BenchmarkHardMaxN:  benchHard,
+		BenchmarkSecret:    strings.TrimSpace(os.Getenv("BENCHMARK_SECRET")),
 	}, nil
 }
