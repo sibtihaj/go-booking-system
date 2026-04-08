@@ -7,9 +7,12 @@ scrape_configs:
     static_configs:
       - targets: ["localhost:9090"]
 
+  # Must include the port your Go API listens on. With scheme: http, omitting the port defaults
+  # to 80 — but this API binds to Railway's PORT (typically 8080). Match Railway service name
+  # (Settings → service name) if yours differs from go-booking-api.
   - job_name: "go-booking-api"
     metrics_path: /metrics
     scheme: http
     static_configs:
-      - targets: ["go-booking-api.railway.internal"]
+      - targets: ["go-booking-api.railway.internal:8080"]
 

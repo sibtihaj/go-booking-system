@@ -26,6 +26,8 @@ The Go API serves Prometheus-formatted metrics at `**GET /metrics`**. The implem
 
 A small observability stack ships in the repo under `[observability/](observability/)`: Prometheus scrapes the API (in the bundled Compose setup, the API runs on the host and is reached at `host.docker.internal:8080`), and Grafana loads a provisioned **Go Booking API** dashboard. The Compose file is `[docker-compose.observability.yml](docker-compose.observability.yml)`. On a hosted API, the same metrics endpoint can be scraped by managed Prometheus or Grafana Cloud; in production it is worth restricting who can reach `/metrics` (network policy, authentication, or private scrape paths), since it exposes operational detail.
 
+**Railway:** The sample config in `[observability/railway/prometheus/prometheus.yml](observability/railway/prometheus/prometheus.yml)` scrapes the Go API at **`your-service-name.railway.internal:8080`**. Prometheus uses `http` and defaults omitted ports to **80**, so the scrape target must include the same port the API listens on (Railway’s `PORT`, usually `8080`). If Grafana shows an empty dashboard but Prometheus is up, check **Status → Targets** in the Prometheus UI and align the hostname with your Railway service name.
+
 ### Same hostname on Vercel (optional)
 
 The Next.js app can **proxy** paths to Grafana, Prometheus, and the raw metrics endpoint using **`rewrites`** in `[apps/web/next.config.ts](apps/web/next.config.ts)`. Set these in the Vercel project (and optionally in `.env.local` for local `next dev`):
