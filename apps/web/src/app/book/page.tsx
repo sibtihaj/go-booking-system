@@ -272,6 +272,7 @@ export default function BookPage() {
       return date.toLocaleDateString([], { month: 'short', day: 'numeric', weekday: 'short' });
     } catch { return iso; }
   };
+  const isNoSlotsState = !loading && (slots?.length ?? 0) === 0;
 
   return (
     <div className="relative min-h-screen font-sans selection:bg-emerald-500/20">
@@ -324,9 +325,14 @@ export default function BookPage() {
 
         <ObservabilityLinks />
 
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-12 lg:gap-10">
+        <div
+          className={cn(
+            "grid grid-cols-1 gap-8 lg:gap-10",
+            isNoSlotsState ? "lg:grid-cols-2" : "lg:grid-cols-12",
+          )}
+        >
           {/* Slots + booking flow */}
-          <div className="lg:col-span-7 space-y-8">
+          <div className={cn("space-y-8", isNoSlotsState ? "lg:col-span-1" : "lg:col-span-7")}>
             <div className="flex items-center justify-between px-2">
               <h2 className="text-sm font-bold uppercase tracking-widest text-emerald-900/40 dark:text-white/40">Available Windows</h2>
               <Button 
@@ -354,7 +360,7 @@ export default function BookPage() {
                 <motion.div 
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  className="flex flex-col items-center justify-center py-20 px-8 rounded-3xl border border-dashed border-emerald-500/20 bg-emerald-500/[0.02]"
+                  className="flex min-h-[220px] flex-col items-center justify-center rounded-3xl border border-dashed border-emerald-500/20 bg-emerald-500/[0.02] px-8 py-16 lg:min-h-[210px]"
                 >
                   <AlertCircle className="h-10 w-10 text-emerald-500/20 mb-4" />
                   <h3 className="text-lg font-bold text-emerald-950 dark:text-white">No slots found</h3>
@@ -437,12 +443,12 @@ export default function BookPage() {
           </div>
 
           {/* Compact policy — reduced vertical footprint */}
-          <aside className="lg:col-span-5">
+          <aside className={cn(isNoSlotsState ? "lg:col-span-1" : "lg:col-span-5")}>
             <motion.div
               initial={{ opacity: 0, x: 16 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.2 }}
-              className="group relative overflow-hidden rounded-2xl border border-white/10 bg-emerald-950 px-5 py-4 text-white shadow-xl dark:border-white/5 dark:bg-emerald-950/90"
+              className="group relative h-full min-h-[220px] overflow-hidden rounded-2xl border border-white/10 bg-emerald-950 px-5 py-4 text-white shadow-xl dark:border-white/5 dark:bg-emerald-950/90"
             >
               <div className="pointer-events-none absolute -right-10 -top-10 h-36 w-36 rounded-full bg-emerald-500/25 blur-[56px] transition-all duration-500 group-hover:bg-emerald-400/30" />
 

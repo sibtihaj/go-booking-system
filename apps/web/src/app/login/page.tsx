@@ -6,21 +6,15 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { createClient } from "@/lib/supabase/client";
-import { Shield, ArrowLeft, Loader2 } from "lucide-react";
+import { Shield, ArrowLeft, Loader2, KeyRound, Mail, ChevronRight } from "lucide-react";
 import { SiteHeader } from "@/components/site-header";
 import { ShowcaseAccordion } from "@/components/showcase/showcase-accordion";
 import { loginShowcaseSections } from "@/content/showcase";
+import { cn } from "@/lib/utils";
 
 function LoginForm() {
   const router = useRouter();
@@ -58,121 +52,176 @@ function LoginForm() {
 
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+      initial={{ opacity: 0, x: -20 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+      className="w-full"
     >
-      <Card className="relative overflow-hidden border-emerald-500/10 bg-white/70 backdrop-blur-xl shadow-2xl dark:border-white/10 dark:bg-black/40">
-        <div className="absolute top-0 left-0 h-1.5 w-full bg-gradient-to-r from-emerald-500 via-cyan-500 to-emerald-500" />
-        <CardHeader className="space-y-1 pt-8">
-          <div className="mb-4 flex justify-center">
-            <div className="rounded-2xl bg-emerald-500/10 p-3 text-emerald-600 ring-1 ring-emerald-500/20 dark:text-emerald-400">
-              <Shield className="h-8 w-8" />
-            </div>
+      <div className="space-y-8">
+        <div className="space-y-3">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-400">
+            <Shield className="h-3.5 w-3.5" />
+            <span className="text-[10px] font-bold uppercase tracking-wider">Secure Access</span>
           </div>
-          <CardTitle className="text-center text-3xl font-bold tracking-tight text-emerald-950 dark:text-white">Access Portal</CardTitle>
-          <CardDescription className="text-center text-muted-foreground">
-            Sign in to manage your bookings and secure your slots.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="pb-8">
-          <form className="flex flex-col gap-6" onSubmit={onSubmit}>
-            <div className="space-y-2">
-              <Label htmlFor="email" className="text-xs font-bold uppercase tracking-wider text-emerald-600/70 dark:text-muted-foreground">
-                Email Address
-              </Label>
+          <h1 className="font-display text-4xl font-extrabold tracking-tight text-emerald-950 dark:text-white sm:text-5xl">
+            Welcome <span className="text-emerald-500/80">Back</span>
+          </h1>
+          <p className="text-muted-foreground text-lg max-w-sm leading-relaxed">
+            Sign in to manage your bookings and secure your slots in real-time.
+          </p>
+        </div>
+
+        <form className="space-y-5" onSubmit={onSubmit}>
+          <div className="space-y-2">
+            <Label htmlFor="email" className="text-[11px] font-bold uppercase tracking-widest text-emerald-900/50 dark:text-emerald-400/50 ml-1">
+              Email Address
+            </Label>
+            <div className="group relative">
+              <div className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-500/40 transition-colors group-focus-within:text-emerald-500">
+                <Mail className="h-5 w-5" />
+              </div>
               <Input
                 id="email"
                 type="email"
                 placeholder="name@example.com"
-                className="h-12 border-emerald-500/10 bg-emerald-500/[0.02] focus:bg-emerald-500/[0.05] transition-all dark:border-white/5 dark:bg-white/5 dark:focus:bg-white/10"
+                className="h-14 pl-12 rounded-2xl border-emerald-500/10 bg-white/50 shadow-sm transition-all focus-visible:ring-2 focus-visible:ring-emerald-500/20 dark:bg-black/20 dark:border-white/5"
                 value={email}
                 onChange={(ev) => setEmail(ev.target.value)}
                 required
               />
             </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="password" className="text-xs font-bold uppercase tracking-wider text-emerald-600/70 dark:text-muted-foreground">
-                  Security Key
-                </Label>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="password" className="text-[11px] font-bold uppercase tracking-widest text-emerald-900/50 dark:text-emerald-400/50 ml-1">
+              Security Key
+            </Label>
+            <div className="group relative">
+              <div className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-500/40 transition-colors group-focus-within:text-emerald-500">
+                <KeyRound className="h-5 w-5" />
               </div>
               <Input
                 id="password"
                 type="password"
                 placeholder="••••••••"
-                className="h-12 border-emerald-500/10 bg-emerald-500/[0.02] focus:bg-emerald-500/[0.05] transition-all dark:border-white/5 dark:bg-white/5 dark:focus:bg-white/10"
+                className="h-14 pl-12 rounded-2xl border-emerald-500/10 bg-white/50 shadow-sm transition-all focus-visible:ring-2 focus-visible:ring-emerald-500/20 dark:bg-black/20 dark:border-white/5"
                 value={password}
                 onChange={(ev) => setPassword(ev.target.value)}
                 required
                 minLength={8}
               />
             </div>
-            <div className="flex flex-col gap-3 pt-2">
-              <Button type="submit" className="h-12 text-lg font-semibold shadow-xl shadow-emerald-500/10" disabled={busy}>
-                {busy ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : "Authorize Access"}
-              </Button>
-              <p className="text-center text-sm text-muted-foreground">
-                Don&apos;t have an account?{" "}
-                <Link
-                  href={signupHref}
-                  className="font-semibold text-emerald-700 underline underline-offset-4 hover:text-emerald-600 dark:text-emerald-400"
-                >
-                  Sign up
-                </Link>
-              </p>
-            </div>
-            <div className="flex flex-col items-center gap-2 text-center sm:flex-row sm:justify-center sm:gap-4">
-              <Link href="/" className="inline-flex items-center text-sm font-medium text-muted-foreground hover:text-emerald-600 transition-colors group dark:hover:text-emerald-400">
-                <ArrowLeft className="mr-2 h-4 w-4 transition-transform group-hover:-translate-x-1" />
-                Return to home
-              </Link>
-              <Link href="/application-architecture" className="text-sm font-medium text-emerald-700 underline underline-offset-4 hover:text-emerald-600 dark:text-emerald-400">
-                Application architecture →
-              </Link>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
+          </div>
+
+          <div className="pt-2">
+            <Button 
+              type="submit" 
+              className="h-14 w-full rounded-2xl text-base font-bold shadow-lg shadow-emerald-600/20 transition-all hover:shadow-emerald-600/30 active:scale-[0.98]" 
+              disabled={busy}
+            >
+              {busy ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : (
+                <>
+                  Authorize Access
+                  <ChevronRight className="ml-2 h-5 w-5" />
+                </>
+              )}
+            </Button>
+          </div>
+        </form>
+
+        <div className="flex flex-col gap-4 pt-4 border-t border-emerald-500/10">
+          <p className="text-sm text-muted-foreground">
+            New to IB Scheduling?{" "}
+            <Link
+              href={signupHref}
+              className="font-bold text-emerald-700 hover:text-emerald-600 dark:text-emerald-400 transition-colors"
+            >
+              Create an account
+            </Link>
+          </p>
+          <div className="flex items-center gap-4">
+            <Link href="/" className="inline-flex items-center text-sm font-medium text-muted-foreground hover:text-emerald-600 transition-colors group dark:hover:text-emerald-400">
+              <ArrowLeft className="mr-2 h-4 w-4 transition-transform group-hover:-translate-x-1" />
+              Back to home
+            </Link>
+          </div>
+        </div>
+      </div>
     </motion.div>
   );
 }
 
 export default function LoginPage() {
   return (
-    <div className="relative flex min-h-screen flex-col">
-      <div className="absolute top-1/4 left-1/2 -z-10 h-[500px] w-[500px] -translate-x-1/2 rounded-full bg-emerald-500/5 blur-[120px] pointer-events-none dark:bg-emerald-500/10" />
+    <div className="relative flex min-h-screen flex-col overflow-hidden">
+      {/* Dynamic Background */}
+      <div className="fixed inset-0 -z-10 bg-[radial-gradient(circle_at_100%_0%,_var(--tw-gradient-stops))] from-emerald-50/50 via-transparent to-transparent dark:from-emerald-950/20 pointer-events-none" />
+      <div className="fixed top-0 left-0 -z-10 h-[600px] w-[600px] bg-emerald-200/10 blur-[140px] rounded-full dark:bg-emerald-500/5 pointer-events-none -translate-x-1/2 -translate-y-1/2" />
+      
       <SiteHeader />
-      <div className="flex flex-1 flex-col items-center gap-10 px-6 py-10 pb-16">
-        <div className="relative z-10 w-full max-w-md">
-          <Suspense
-            fallback={
-              <Card className="border-emerald-500/10 bg-white/70 backdrop-blur-xl dark:border-white/10 dark:bg-black/40">
-                <CardHeader className="space-y-4">
-                  <Skeleton className="mx-auto h-12 w-12 rounded-2xl" />
-                  <Skeleton className="mx-auto h-8 w-40" />
-                  <Skeleton className="mx-auto h-4 w-full" />
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <Skeleton className="h-12 w-full" />
-                  <Skeleton className="h-12 w-full" />
-                  <Skeleton className="h-12 w-full" />
-                </CardContent>
-              </Card>
-            }
-          >
-            <LoginForm />
-          </Suspense>
+      
+      <main className="flex-1 flex flex-col items-center justify-center px-6 py-12 lg:py-20">
+        <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-2 gap-16 lg:gap-24 items-center">
+          
+          {/* Left: Form Column */}
+          <div className="w-full max-w-md mx-auto lg:mx-0 order-2 lg:order-1">
+            <Suspense
+              fallback={
+                <div className="space-y-8">
+                  <div className="space-y-4">
+                    <Skeleton className="h-8 w-32 rounded-full" />
+                    <Skeleton className="h-12 w-64" />
+                    <Skeleton className="h-20 w-full" />
+                  </div>
+                  <div className="space-y-6">
+                    <Skeleton className="h-14 w-full rounded-2xl" />
+                    <Skeleton className="h-14 w-full rounded-2xl" />
+                    <Skeleton className="h-14 w-full rounded-2xl" />
+                  </div>
+                </div>
+              }
+            >
+              <LoginForm />
+            </Suspense>
+          </div>
+
+          {/* Right: Info/Accordion Column */}
+          <div className="order-1 lg:order-2 space-y-8">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2, duration: 0.5 }}
+              className="space-y-6"
+            >
+              <div className="p-8 rounded-[2.5rem] bg-emerald-950 text-white dark:bg-emerald-900/40 border border-white/5 shadow-2xl relative overflow-hidden group">
+                <div className="absolute top-0 right-0 -mr-16 -mt-16 h-64 w-64 bg-emerald-500/20 blur-[80px] rounded-full group-hover:bg-emerald-500/30 transition-colors duration-700" />
+                
+                <div className="relative z-10 space-y-4">
+                  <h2 className="font-display text-2xl font-bold tracking-tight">System Architecture</h2>
+                  <p className="text-emerald-100/60 text-sm leading-relaxed max-w-md">
+                    Explore how we handle high-concurrency booking using Go goroutines and Postgres row-level locking.
+                  </p>
+                  <Link 
+                    href="/application-architecture"
+                    className="group/btn inline-flex items-center gap-2 text-sm font-bold text-emerald-400 hover:text-emerald-300 transition-colors pt-2"
+                  >
+                    View technical deep-dive
+                    <ChevronRight className="h-4 w-4 transition-transform group-hover/btn:translate-x-1" />
+                  </Link>
+                </div>
+              </div>
+
+              <ShowcaseAccordion
+                title="Auth & session (this step)"
+                description="What happens when you sign in: Supabase sessions, Next middleware, and why the Go API trusts your Bearer token."
+                sections={loginShowcaseSections}
+                defaultOpenIds={["supabase-session"]}
+                className="border-emerald-500/10 bg-white/40 dark:bg-white/[0.02]"
+              />
+            </motion.div>
+          </div>
         </div>
-        <div className="relative z-10 w-full max-w-3xl">
-          <ShowcaseAccordion
-            title="Auth & session (this step)"
-            description="What happens when you sign in: Supabase sessions, Next middleware, and why the Go API trusts your Bearer token."
-            sections={loginShowcaseSections}
-            defaultOpenIds={["supabase-session"]}
-          />
-        </div>
-      </div>
+      </main>
     </div>
   );
 }

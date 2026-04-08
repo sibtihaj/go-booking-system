@@ -16,4 +16,4 @@ The browser talks to **Supabase** for auth and any direct client-side data acces
 
 The `package.json` scripts follow usual Next.js conventions (`dev`, `build`, `start`, `lint`). There is also an `**api`** script that starts the Go server from the sibling `apps/api` folder, which is convenient when both halves of the stack are developed from this tree.
 
-This README is intentionally descriptive: it explains what was built and how the pieces relate. For environment variable names and deployment topology, see the root `**DEPLOY.md**` and the `**.env.example**` files in `apps/web` and `apps/api`.
+This README is intentionally descriptive: it explains what was built and how the pieces relate. For environment variable names and deployment topology, see the root `**DEPLOY.md`** and the `**.env.example**` files in `apps/web` and `apps/api`.
