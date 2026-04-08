@@ -16,15 +16,25 @@ import { ShowcaseAccordion } from "@/components/showcase/showcase-accordion";
 import { loginShowcaseSections } from "@/content/showcase";
 import { cn } from "@/lib/utils";
 
+function sanitizeNextPath(next: string | null): string {
+  if (!next || !next.startsWith("/") || next.startsWith("//")) return "/book";
+  if (next.length > 200) return "/book";
+  if (next.includes(".segments") || next.includes("_tree.segment")) return "/book";
+  if (
+    next.startsWith("/grafana-dashboard") ||
+    next.startsWith("/prometheus-dashboard") ||
+    next.startsWith("/booking-api-metrics")
+  ) {
+    return "/book";
+  }
+  return next;
+}
+
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const nextPath = useMemo(() => {
-    const next = searchParams.get("next");
-    if (next && next.startsWith("/") && !next.startsWith("//")) {
-      return next;
-    }
-    return "/book";
+    return sanitizeNextPath(searchParams.get("next"));
   }, [searchParams]);
   const signupHref = `/signup?next=${encodeURIComponent(nextPath)}`;
   const [email, setEmail] = useState("");
@@ -43,8 +53,14 @@ function LoginForm() {
         return;
       }
       toast.success("Identity verified");
-      router.push(nextPath);
+      router.replace(nextPath);
       router.refresh();
+      // Fallback for rare client-router stalls in production after auth cookie changes.
+      window.setTimeout(() => {
+        if (window.location.pathname !== nextPath) {
+          window.location.assign(nextPath);
+        }
+      }, 350);
     } finally {
       setBusy(false);
     }

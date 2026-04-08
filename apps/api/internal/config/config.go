@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -46,9 +47,8 @@ func Load() (*Config, error) {
 		parts := strings.Split(raw, ",")
 		out := make([]string, 0, len(parts))
 		for _, p := range parts {
-			p = strings.TrimSpace(p)
-			if p != "" {
-				out = append(out, p)
+			if origin := normalizeCORSOrigin(p); origin != "" {
+				out = append(out, origin)
 			}
 		}
 		if len(out) > 0 {
@@ -106,4 +106,17 @@ func Load() (*Config, error) {
 		BenchmarkHardMaxN:  benchHard,
 		BenchmarkSecret:    strings.TrimSpace(os.Getenv("BENCHMARK_SECRET")),
 	}, nil
+}
+
+func normalizeCORSOrigin(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	parsed, err := url.Parse(raw)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return strings.TrimRight(raw, "/")
+	}
+	// CORS origin matching is exact scheme+host(+port), without path/trailing slash.
+	return parsed.Scheme + "://" + parsed.Host
 }
