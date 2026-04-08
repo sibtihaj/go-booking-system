@@ -14,7 +14,9 @@ import { Shield, ArrowLeft, Loader2, KeyRound, Mail, ChevronRight } from "lucide
 import { SiteHeader } from "@/components/site-header";
 import { ShowcaseAccordion } from "@/components/showcase/showcase-accordion";
 import { loginShowcaseSections } from "@/content/showcase";
-import { cn } from "@/lib/utils";
+
+const DEMO_EMAIL = "admin@noemail.com";
+const DEMO_PASSWORD = "admin123";
 
 function sanitizeNextPath(next: string | null): string {
   if (!next || !next.startsWith("/") || next.startsWith("//")) return "/book";
@@ -43,16 +45,75 @@ function LoginForm() {
 
   const supabase = useMemo(() => createClient(), []);
 
+  async function signInDemoAccount() {
+    const firstAttempt = await supabase.auth.signInWithPassword({
+      email: DEMO_EMAIL,
+      password: DEMO_PASSWORD,
+    });
+    if (!firstAttempt.error) return { ok: true as const };
+
+    const invalidCredentials =
+      firstAttempt.error.message.toLowerCase().includes("invalid login credentials");
+    if (!invalidCredentials) {
+      return { ok: false as const, message: firstAttempt.error.message };
+    }
+
+    const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`;
+    const { data: signupData, error: signupError } = await supabase.auth.signUp({
+      email: DEMO_EMAIL,
+      password: DEMO_PASSWORD,
+      options: { emailRedirectTo: redirectTo },
+    });
+
+    if (signupError && !signupError.message.toLowerCase().includes("already")) {
+      return { ok: false as const, message: signupError.message };
+    }
+
+    if (signupData.user && !signupData.session) {
+      return {
+        ok: false as const,
+        message:
+          "Demo account requires email confirmation in this environment. Use Create account and confirm your email before signing in.",
+      };
+    }
+
+    const secondAttempt = await supabase.auth.signInWithPassword({
+      email: DEMO_EMAIL,
+      password: DEMO_PASSWORD,
+    });
+    if (secondAttempt.error) {
+      return {
+        ok: false as const,
+        message:
+          "Could not sign in with the demo account. Use Create account and confirm your email, then sign in again.",
+      };
+    }
+
+    return { ok: true as const };
+  }
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) {
-        toast.error(error.message);
-        return;
+      const usingDemoAccount =
+        email.trim().toLowerCase() === DEMO_EMAIL && password === DEMO_PASSWORD;
+      if (usingDemoAccount) {
+        const demoResult = await signInDemoAccount();
+        if (!demoResult.ok) {
+          toast.error(demoResult.message);
+          return;
+        }
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) {
+          toast.error(
+            `${error.message}. If you are new, create an account first and confirm your email address.`,
+          );
+          return;
+        }
       }
-      toast.success("Identity verified");
+      toast.success(usingDemoAccount ? "Demo access verified" : "Identity verified");
       router.replace(nextPath);
       router.refresh();
       // Fallback for rare client-router stalls in production after auth cookie changes.
@@ -84,6 +145,17 @@ function LoginForm() {
           </h1>
           <p className="text-muted-foreground text-lg max-w-sm leading-relaxed">
             Sign in to manage your bookings and secure your slots in real-time.
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4 text-sm">
+          <p className="font-semibold text-emerald-800 dark:text-emerald-300">
+            Demo login: <span className="font-mono">{DEMO_EMAIL}</span> /{" "}
+            <span className="font-mono">{DEMO_PASSWORD}</span>
+          </p>
+          <p className="mt-1 text-muted-foreground">
+            If demo login is blocked in this environment, create an account and confirm your email
+            from the inbox, then sign in.
           </p>
         </div>
 
@@ -217,13 +289,22 @@ export default function LoginPage() {
                   <p className="text-emerald-100/60 text-sm leading-relaxed max-w-md">
                     Explore how we handle high-concurrency booking using Go goroutines and Postgres row-level locking.
                   </p>
-                  <Link 
-                    href="/application-architecture"
-                    className="group/btn inline-flex items-center gap-2 text-sm font-bold text-emerald-400 hover:text-emerald-300 transition-colors pt-2"
-                  >
-                    View technical deep-dive
-                    <ChevronRight className="h-4 w-4 transition-transform group-hover/btn:translate-x-1" />
-                  </Link>
+                  <div className="flex flex-wrap items-center gap-3 pt-2">
+                    <Link 
+                      href="/application-architecture"
+                      className="group/btn inline-flex items-center gap-2 text-sm font-bold text-emerald-400 hover:text-emerald-300 transition-colors"
+                    >
+                      App architecture
+                      <ChevronRight className="h-4 w-4 transition-transform group-hover/btn:translate-x-1" />
+                    </Link>
+                    <Link 
+                      href="/deployment-architecture"
+                      className="group/btn inline-flex items-center gap-2 text-sm font-bold text-emerald-400 hover:text-emerald-300 transition-colors"
+                    >
+                      Deployment architecture
+                      <ChevronRight className="h-4 w-4 transition-transform group-hover/btn:translate-x-1" />
+                    </Link>
+                  </div>
                 </div>
               </div>
 

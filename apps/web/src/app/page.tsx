@@ -117,6 +117,10 @@ export default function Home() {
                   <Link href="/application-architecture" className="font-medium text-emerald-700 underline underline-offset-4 hover:text-emerald-600 dark:text-emerald-400">
                     Application Architecture
                   </Link>{" "}
+                  and{" "}
+                  <Link href="/deployment-architecture" className="font-medium text-emerald-700 underline underline-offset-4 hover:text-emerald-600 dark:text-emerald-400">
+                    Deployment Architecture
+                  </Link>{" "}
                   (includes a{" "}
                   <Link
                     href="/application-architecture#system-architecture"

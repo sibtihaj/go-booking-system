@@ -18,6 +18,7 @@ import {
 import { Button, buttonVariants } from "@/components/ui/button";
 import { ArrowLeft, Expand, Shrink, X } from "lucide-react";
 import { ArchitectureDiagram } from "@/components/architecture/architecture-diagram";
+import { DeploymentArchitectureDiagram } from "@/components/architecture/deployment-architecture-diagram";
 
 export default function ApplicationArchitecturePage() {
   const { resolvedTheme } = useTheme();
@@ -122,6 +123,45 @@ export default function ApplicationArchitecturePage() {
 
         <Card className="border-emerald-500/10 bg-white/70 backdrop-blur-md dark:bg-white/[0.04]">
           <CardHeader>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge
+                variant="outline"
+                className="border-emerald-500/20 bg-emerald-500/5 text-emerald-800 dark:text-emerald-300"
+              >
+                Deployment
+              </Badge>
+              <CardTitle className="text-emerald-950 dark:text-white">
+                Deployment diagram
+              </CardTitle>
+            </div>
+            <CardDescription className="text-pretty">
+              How Supabase, Vercel, and Railway services are connected in production.
+            </CardDescription>
+            <div className="pt-2">
+              <Link
+                href="/deployment-architecture"
+                className={buttonVariants({
+                  variant: "outline",
+                  className: "rounded-xl",
+                })}
+              >
+                View full deployment architecture
+              </Link>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <DeploymentArchitectureDiagram key={`inline-${resolvedTheme === "dark" ? "dark" : "light"}`} />
+            <p className="mt-4 text-center text-xs text-muted-foreground">
+              Source:{" "}
+              <code className="font-mono text-[11px]">
+                apps/web/src/content/deployment-architecture.mmd.ts
+              </code>
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-emerald-500/10 bg-white/70 backdrop-blur-md dark:bg-white/[0.04]">
+          <CardHeader>
             <div className="flex items-center gap-2">
               <Badge
                 variant="outline"
@@ -151,7 +191,7 @@ export default function ApplicationArchitecturePage() {
               <tbody>
                 {apiEndpointsTable.map((row) => (
                   <tr
-                    key={row.path}
+                    key={`${row.method}:${row.path}:${row.handler}`}
                     className="border-b border-emerald-500/10 last:border-0"
                   >
                     <td className="py-2 pr-4 font-mono text-xs">{row.method}</td>

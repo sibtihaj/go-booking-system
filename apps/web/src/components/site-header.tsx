@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
 import { ObservabilityNavBarGroup } from "@/components/observability-nav-buttons";
-import { Calendar, LogIn, BookOpen, UserPlus } from "lucide-react";
+import { Calendar, LogIn, BookOpen, Server, UserPlus } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function SiteHeader({
@@ -35,6 +35,17 @@ export function SiteHeader({
         >
           <BookOpen className="h-4 w-4" />
           Application Architecture
+        </Link>
+        <Link
+          href="/deployment-architecture"
+          className={buttonVariants({
+            variant: "outline",
+            className:
+              "h-10 gap-1.5 rounded-xl border-emerald-500/20 bg-emerald-500/5 text-emerald-900 hover:bg-emerald-500/10 dark:text-emerald-100",
+          })}
+        >
+          <Server className="h-4 w-4" />
+          Deployment Architecture
         </Link>
         <ObservabilityNavBarGroup />
         <Link

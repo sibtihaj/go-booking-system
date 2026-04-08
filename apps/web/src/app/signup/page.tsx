@@ -14,7 +14,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Shield, ArrowLeft, Loader2, Mail, KeyRound, ChevronRight, UserPlus } from "lucide-react";
 import { ShowcaseAccordion } from "@/components/showcase/showcase-accordion";
 import { loginShowcaseSections } from "@/content/showcase";
-import { cn } from "@/lib/utils";
 
 function sanitizeNextPath(next: string | null): string {
   if (!next || !next.startsWith("/") || next.startsWith("//")) return "/book";
@@ -260,6 +259,22 @@ export default function SignupPage() {
                   <p className="text-emerald-100/60 text-sm leading-relaxed max-w-md">
                     This system demonstrates a production-grade architecture using Next.js, Go, and Supabase to solve real-world scheduling challenges.
                   </p>
+                  <div className="flex flex-wrap items-center gap-3 pt-1">
+                    <Link
+                      href="/application-architecture"
+                      className="group/btn inline-flex items-center gap-2 text-sm font-bold text-emerald-400 hover:text-emerald-300 transition-colors"
+                    >
+                      App architecture
+                      <ChevronRight className="h-4 w-4 transition-transform group-hover/btn:translate-x-1" />
+                    </Link>
+                    <Link
+                      href="/deployment-architecture"
+                      className="group/btn inline-flex items-center gap-2 text-sm font-bold text-emerald-400 hover:text-emerald-300 transition-colors"
+                    >
+                      Deployment architecture
+                      <ChevronRight className="h-4 w-4 transition-transform group-hover/btn:translate-x-1" />
+                    </Link>
+                  </div>
                   <div className="flex items-center gap-4 pt-2">
                     <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-emerald-400">
                       <Shield className="h-3.5 w-3.5" />
