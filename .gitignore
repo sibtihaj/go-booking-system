@@ -1,6 +1,6 @@
 
-#Ignore cursor AI rules
-.cursor/rules/codacy.mdc
+# Ignore Cursor workspace files
+.cursor/
 
 # Dependencies & build
 node_modules/
@@ -19,3 +19,4 @@ coverage/
 # OS / IDE
 .DS_Store
 *.log
+
