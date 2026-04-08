@@ -24,21 +24,34 @@ flowchart TB
     API["Go API — chi, go-oidc, pgx"]
   end
 
+  subgraph ob["Observability"]
+    METRICS["/metrics endpoint (Prometheus text)"]
+    PROM["Prometheus — scrape + store time-series"]
+    GRAFANA["Grafana — dashboards and queries"]
+  end
+
   UI <-->|"HTTP / RSC"| MW
   UI -->|"supabase-js"| AUTH
   MW -->|"refresh session"| AUTH
   UI -->|"Bearer JWT"| API
   API -->|"go-oidc validate"| AUTH
   API -->|"pgx SQL"| DB
+  API -->|"exposes runtime/app metrics"| METRICS
+  PROM -->|"scrapes /metrics"| METRICS
+  GRAFANA -->|"PromQL queries"| PROM
 
   classDef cxFill fill:#ecfdf5,stroke:#10b981,color:#064e3b
   classDef nxFill fill:#f0f9ff,stroke:#0ea5e9,color:#0c4a6e
   classDef sxFill fill:#fdf2f8,stroke:#db2777,color:#500724
   classDef gxFill fill:#f0fdfa,stroke:#0d9488,color:#134e4a
+  classDef oxFill fill:#fff7ed,stroke:#f97316,color:#9a3412
 
   class UI cxFill
   class MW nxFill
   class AUTH sxFill
   class DB sxFill
   class API gxFill
+  class METRICS oxFill
+  class PROM oxFill
+  class GRAFANA oxFill
 `.trim();

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useTheme } from "next-themes";
 import { SiteHeader } from "@/components/site-header";
@@ -14,12 +15,43 @@ import {
   applicationArchitectureAllSections,
   applicationArchitectureIntro,
 } from "@/content/showcase";
-import { buttonVariants } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { ArrowLeft, Expand, Shrink, X } from "lucide-react";
 import { ArchitectureDiagram } from "@/components/architecture/architecture-diagram";
 
 export default function ApplicationArchitecturePage() {
   const { resolvedTheme } = useTheme();
+  const [diagramModalOpen, setDiagramModalOpen] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const modalContentRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(Boolean(document.fullscreenElement));
+    };
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+    };
+  }, []);
+
+  const handleToggleFullscreen = async () => {
+    try {
+      if (!document.fullscreenElement && modalContentRef.current) {
+        await modalContentRef.current.requestFullscreen();
+        setIsFullscreen(true);
+        return;
+      }
+
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+        setIsFullscreen(false);
+      }
+    } catch {
+      setIsFullscreen(Boolean(document.fullscreenElement));
+    }
+  };
 
   return (
     <div className="relative min-h-screen">
@@ -67,6 +99,17 @@ export default function ApplicationArchitecturePage() {
               <code className="font-mono text-xs">access_token</code> as a Bearer JWT, verified against
               the Auth issuer (JWKS).
             </CardDescription>
+            <div className="pt-2">
+              <Button
+                type="button"
+                size="lg"
+                className="h-12 rounded-xl bg-emerald-600 px-6 text-base font-semibold text-white shadow-md shadow-emerald-600/25 transition-colors hover:bg-emerald-700"
+                onClick={() => setDiagramModalOpen(true)}
+              >
+                <Expand className="mr-2 h-5 w-5" />
+                Open diagram
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             <ArchitectureDiagram key={resolvedTheme === "dark" ? "dark" : "light"} />
@@ -169,6 +212,58 @@ export default function ApplicationArchitecturePage() {
           defaultOpenIds={["stack", "supabase-session", "load-availability"]}
         />
       </main>
+
+      {diagramModalOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-label="System architecture diagram modal"
+        >
+          <div
+            ref={modalContentRef}
+            className="relative flex h-[90vh] w-full max-w-7xl flex-col rounded-2xl border border-emerald-500/20 bg-background shadow-2xl"
+          >
+            <div className="flex items-center justify-between border-b border-border px-4 py-3">
+              <h2 className="text-sm font-semibold text-foreground md:text-base">System diagram</h2>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="rounded-lg"
+                  onClick={handleToggleFullscreen}
+                >
+                  {isFullscreen ? (
+                    <>
+                      <Shrink className="mr-1.5 h-4 w-4" />
+                      Exit fullscreen
+                    </>
+                  ) : (
+                    <>
+                      <Expand className="mr-1.5 h-4 w-4" />
+                      Fullscreen
+                    </>
+                  )}
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="rounded-lg"
+                  onClick={() => setDiagramModalOpen(false)}
+                  aria-label="Close diagram modal"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+            <div className="min-h-0 flex-1 overflow-auto p-4 md:p-6">
+              <ArchitectureDiagram key={`modal-${resolvedTheme === "dark" ? "dark" : "light"}`} />
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
