@@ -1,4 +1,5 @@
 import { BookingArchitectureDiagrams } from "@/components/booking/booking-architecture-diagrams";
+import { GoNodeConcurrencyTable } from "@/components/showcase/go-node-concurrency-table";
 import { Badge } from "@/components/ui/badge";
 import type { ShowcaseSection } from "@/content/showcase";
 import { cn } from "@/lib/utils";
@@ -87,6 +88,10 @@ export function ShowcaseSectionContent({
             <li key={`${section.id}-b-${idx}`}>{b}</li>
           ))}
         </ul>
+      ) : null}
+
+      {section.customContent === "go-node-concurrency-table" ? (
+        <GoNodeConcurrencyTable />
       ) : null}
 
       <div className="grid gap-4 sm:grid-cols-2">

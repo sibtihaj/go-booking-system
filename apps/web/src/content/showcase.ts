@@ -17,7 +17,7 @@ export type CodeRef = {
   note: string;
 };
 
-export type ShowcaseCustomContent = "booking-architecture";
+export type ShowcaseCustomContent = "booking-architecture" | "go-node-concurrency-table";
 
 export type ShowcaseSection = {
   id: string;
@@ -213,6 +213,7 @@ export const bookShowcaseSections: ShowcaseSection[] = [
     title: "Concurrency, pooling, and why the booking engine is Go (not Node)",
     summary:
       "The UI stays in TypeScript (Next.js). The authoritative booking API is a separate Go process so we get cheap goroutines per request, efficient I/O scheduling, and a small memory footprint under parallel load. Correctness still comes from Postgres (row locks + unique constraints), but the service layer can sustain many concurrent short transactions without the same event-loop and GC pressure as a typical Node HTTP server handling the same pattern.",
+    customContent: "go-node-concurrency-table",
     bullets: [
       "Node / Server Actions / API routes: one thread runs JavaScript; concurrency is cooperative async/await. Throughput is often excellent, but under a burst of parallel booking work, tail latency can grow from scheduling, GC, and pool contention — you still size a DB pool (e.g. node-postgres) to match Postgres.",
       "Go + chi: each request runs in its own goroutine; the runtime multiplexes thousands of lightweight goroutines onto OS threads. For many I/O-bound handlers (JWT verify + BEGIN … FOR UPDATE + COMMIT), this shape often shows lower per-request overhead and more predictable behavior at high concurrency than a single Node process — exact numbers depend on hardware and DB limits.",
@@ -220,18 +221,23 @@ export const bookShowcaseSections: ShowcaseSection[] = [
       "Supabase / Postgres: use a pooled connection string from the dashboard (Session or Transaction pooler for IPv4). The pooler has separate limits for client connections vs backend connections to Postgres; your app’s pgxpool MaxConns should stay well below Postgres max_connections and the pooler’s capacity. See Supabase docs: “Connection management” and “compute and disk” for tier limits.",
       "10,000 concurrent operations: the Go server can start 10,000 goroutines, but only DBMaxConns simultaneous transactions hit Postgres — the rest wait on the pool (by design). A nano/free-tier instance is not sized for sustained 10k bookings/sec; use this demo up to a few hundred on shared tiers, load-test larger values on dedicated compute with monitoring.",
       "Goroutines vs connection pooling (simulation): each goroutine runs BeginTx → reserve → Commit, but pgxpool.Acquire hands out at most MaxConns connections. If 500 goroutines run and MaxConns is 10, only 10 hold a live transaction at any instant; the other 490 block until a connection frees. That back-pressure protects Postgres from being opened unbounded; wall-clock time for the concurrent phase grows with N/pool width, not with goroutine count alone.",
-      "Interactive stress test: on /book, use the “Concurrent booking simulation” panel under Available Windows — it calls the same reserve path as Reserve Slot, in parallel, then cleans up. The JSON response includes db_max_conns and a note reiterating pool behavior.",
+      "Interactive stress test: on /book, use the “Concurrent booking simulation” panel — it calls the same reserve path as Reserve Slot, in parallel, then cleans up. Each successful commit triggers authenticated POSTs to demo mimic email and WhatsApp routes (no real messages); Prometheus exposes booking_mimic_email_notifications_total and booking_mimic_whatsapp_notifications_total by HTTP status for Grafana. The JSON response includes db_max_conns, mimic_*_by_code tallies, and a note on pool behavior.",
     ],
     http: {
       method: "POST",
       path: "/api/v1/benchmark/booking-rush",
-      note: 'Body: { "n": number, "resource_id": "uuid" } — creates N slots, N concurrent reserves, then deletes (stress demo).',
+      note: 'Body: { "n": number, "resource_id": "uuid" } — creates N slots, N concurrent reserves, mimic notification POSTs per success, then deletes (stress demo).',
     },
     goRefs: [
       {
         file: "apps/api/internal/handlers/benchmark.go",
         symbol: "BenchmarkBookingRush",
-        note: "Batch insert slots; WaitGroup + goroutines calling ReserveConfirmedSlot; cleanup.",
+        note: "Batch insert slots; WaitGroup + goroutines calling ReserveConfirmedSlot; loopback mimic HTTP per success; cleanup.",
+      },
+      {
+        file: "apps/api/internal/handlers/mimic.go",
+        symbol: "MimicEmailPost",
+        note: "Demo email/WhatsApp providers; deterministic faux HTTP statuses for Grafana.",
       },
       {
         file: "apps/api/internal/handlers/handlers.go",
@@ -247,7 +253,7 @@ export const bookShowcaseSections: ShowcaseSection[] = [
     tsRefs: [
       {
         file: "apps/web/src/components/booking/booking-concurrency-lab.tsx",
-        note: "Runner on /book; input capped at 10_000; POST /api/v1/benchmark/booking-rush.",
+        note: "Runner on /book; input capped at 10_000; booking-rush + mimic status summaries in the results panel.",
       },
     ],
   },
@@ -423,6 +429,20 @@ export const apiEndpointsTable: {
     auth: "Bearer (Supabase access_token)",
     handler: "API.BenchmarkBookingRush",
     file: "apps/api/internal/handlers/benchmark.go",
+  },
+  {
+    method: "POST",
+    path: "/api/v1/mimic/notification/email",
+    auth: "Bearer (Supabase access_token)",
+    handler: "API.MimicEmailPost",
+    file: "apps/api/internal/handlers/mimic.go",
+  },
+  {
+    method: "POST",
+    path: "/api/v1/mimic/notification/whatsapp",
+    auth: "Bearer (Supabase access_token)",
+    handler: "API.MimicWhatsAppPost",
+    file: "apps/api/internal/handlers/mimic.go",
   },
 ];
 

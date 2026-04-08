@@ -36,6 +36,10 @@ type API struct {
 	BenchmarkSecret   string
 	// Metrics is optional Prometheus instrumentation (nil disables increments).
 	Metrics *obsmetrics.Metrics
+	// MimicBaseURL is the loopback base URL for benchmark-driven mimic HTTP calls (e.g. http://127.0.0.1:8080).
+	MimicBaseURL string
+	// MimicHTTPClient is used by the booking-rush benchmark to POST mimic notification endpoints on this process.
+	MimicHTTPClient *http.Client
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

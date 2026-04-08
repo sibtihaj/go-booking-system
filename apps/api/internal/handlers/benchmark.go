@@ -4,7 +4,9 @@ import (
 	"context"
 	"crypto/subtle"
 	"encoding/json"
+	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -34,6 +36,40 @@ type BenchmarkBookingRushResponse struct {
 	DBMaxConns        int32   `json:"db_max_conns"`
 	AllowedMaxN       int     `json:"allowed_max_n"`
 	Note              string  `json:"note"`
+	// Mimic* summarize HTTP calls to demo notification endpoints (same process); keys are status codes as strings.
+	MimicEmailByCode    map[string]int64 `json:"mimic_email_by_code,omitempty"`
+	MimicWhatsAppByCode map[string]int64 `json:"mimic_whatsapp_by_code,omitempty"`
+}
+
+type mimicCodeAgg struct {
+	mu sync.Mutex
+	m  map[string]int64
+}
+
+func (c *mimicCodeAgg) add(code int) {
+	key := strconv.Itoa(code)
+	if code == 0 {
+		key = "client_error"
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.m == nil {
+		c.m = make(map[string]int64)
+	}
+	c.m[key]++
+}
+
+func (c *mimicCodeAgg) snapshot() map[string]int64 {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if len(c.m) == 0 {
+		return nil
+	}
+	out := make(map[string]int64, len(c.m))
+	for k, v := range c.m {
+		out[k] = v
+	}
+	return out
 }
 
 // BenchmarkBookingRush inserts N future slots, runs N concurrent reservation transactions (same JWT user),
@@ -122,15 +158,20 @@ returning id
 
 	t1 := time.Now()
 	var okCount, failCount int64
+	authHeader := strings.TrimSpace(r.Header.Get("Authorization"))
+	var emailAgg, waAgg mimicCodeAgg
 
 	var wg sync.WaitGroup
-	for _, sid := range slotIDs {
+	for i, sid := range slotIDs {
 		wg.Add(1)
-		go func(slotID uuid.UUID) {
+		go func(idx int, slotID uuid.UUID) {
 			defer wg.Done()
 			tx, err := a.Pool.BeginTx(ctx, pgx.TxOptions{})
 			if err != nil {
 				atomic.AddInt64(&failCount, 1)
+				if a.Metrics != nil {
+					a.Metrics.IncReservation("error")
+				}
 				return
 			}
 			defer func() { _ = tx.Rollback(ctx) }()
@@ -138,14 +179,57 @@ returning id
 			_, err = ReserveConfirmedSlot(ctx, tx, userID, slotID)
 			if err != nil {
 				atomic.AddInt64(&failCount, 1)
+				if a.Metrics != nil {
+					switch {
+					case errors.Is(err, ErrSlotNotFound):
+						a.Metrics.IncReservation("not_found")
+					case errors.Is(err, ErrReservationConflict):
+						a.Metrics.IncReservation("conflict")
+					default:
+						a.Metrics.IncReservation("error")
+					}
+				}
 				return
 			}
 			if err := tx.Commit(ctx); err != nil {
 				atomic.AddInt64(&failCount, 1)
+				if a.Metrics != nil {
+					a.Metrics.IncReservation("error")
+				}
 				return
 			}
 			atomic.AddInt64(&okCount, 1)
-		}(sid)
+			if a.Metrics != nil {
+				a.Metrics.IncReservation("created")
+			}
+
+			// After DB commit: parallel mimic “email” + “WhatsApp” HTTP calls (same API process).
+			if a.MimicHTTPClient != nil && strings.TrimSpace(a.MimicBaseURL) != "" && authHeader != "" {
+				var inner sync.WaitGroup
+				inner.Add(2)
+				go func() {
+					defer inner.Done()
+					code := a.postMimicNotification(authHeader, "/api/v1/mimic/notification/email", idx)
+					if code == 0 {
+						if a.Metrics != nil {
+							a.Metrics.IncMimicEmail("client_error")
+						}
+					}
+					emailAgg.add(code)
+				}()
+				go func() {
+					defer inner.Done()
+					code := a.postMimicNotification(authHeader, "/api/v1/mimic/notification/whatsapp", idx)
+					if code == 0 {
+						if a.Metrics != nil {
+							a.Metrics.IncMimicWhatsApp("client_error")
+						}
+					}
+					waAgg.add(code)
+				}()
+				inner.Wait()
+			}
+		}(i, sid)
 	}
 	wg.Wait()
 	phaseMs = float64(time.Since(t1).Microseconds()) / 1000.0
@@ -165,7 +249,8 @@ returning id
 	note := "Goroutines are cheap, but Postgres connections are not: pgxpool keeps a bounded pool (see db_max_conns). " +
 		"Each simulated booking calls Pool.BeginTx, which Acquire()s a connection from the pool; if every connection is busy, extra goroutines block until Commit/Rollback returns a conn. " +
 		"So N goroutines does not mean N simultaneous DB sessions — at most MaxConns transactions run at once; the rest queue in the pool. " +
-		"Behind that, Supabase’s pooler has its own client/backend limits; size DB_MAX_CONNS to your tier."
+		"Behind that, Supabase’s pooler has its own client/backend limits; size DB_MAX_CONNS to your tier. " +
+		"After each successful commit, the benchmark POSTs to /api/v1/mimic/notification/email and /whatsapp (demo providers); Grafana charts booking_mimic_email_notifications_total and booking_mimic_whatsapp_notifications_total by HTTP status code."
 
 	benchmarkSuccess = true
 	writeJSON(w, http.StatusOK, BenchmarkBookingRushResponse{
@@ -180,6 +265,8 @@ returning id
 		DBMaxConns:        a.Pool.Config().MaxConns,
 		AllowedMaxN:       allowed,
 		Note:              note,
+		MimicEmailByCode:    emailAgg.snapshot(),
+		MimicWhatsAppByCode: waAgg.snapshot(),
 	})
 }
 

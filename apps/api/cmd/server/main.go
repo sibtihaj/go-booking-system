@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -80,6 +81,20 @@ func main() {
 		om = obsmetrics.New(pool)
 	}
 
+	mimicBase := loopbackHTTPBase(cfg.Addr)
+	if b := strings.TrimSpace(os.Getenv("MIMIC_HTTP_BASE")); b != "" {
+		mimicBase = strings.TrimRight(b, "/")
+	}
+	mimicClient := &http.Client{
+		Timeout: 60 * time.Second,
+		Transport: &http.Transport{
+			MaxConnsPerHost:     16384,
+			MaxIdleConns:        16384,
+			MaxIdleConnsPerHost: 16384,
+			IdleConnTimeout:     90 * time.Second,
+		},
+	}
+
 	api := &handlers.API{
 		Pool:              pool,
 		SlotCreateSecret:  strings.TrimSpace(os.Getenv("SLOT_CREATE_SECRET")),
@@ -87,6 +102,8 @@ func main() {
 		BenchmarkHardMaxN: cfg.BenchmarkHardMaxN,
 		BenchmarkSecret:   cfg.BenchmarkSecret,
 		Metrics:           om,
+		MimicBaseURL:      mimicBase,
+		MimicHTTPClient:   mimicClient,
 	}
 
 	r := chi.NewRouter()
@@ -117,6 +134,8 @@ func main() {
 			r.With(verifier.Middleware).Get("/reservations", api.ListMyReservations)
 			r.With(verifier.Middleware).Post("/reservations", api.CreateReservation)
 			r.With(verifier.Middleware).Post("/slots", api.CreateSlot)
+			r.With(verifier.Middleware).Post("/mimic/notification/email", api.MimicEmailPost)
+			r.With(verifier.Middleware).Post("/mimic/notification/whatsapp", api.MimicWhatsAppPost)
 		})
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.Timeout(5 * time.Minute))
@@ -147,4 +166,26 @@ func main() {
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		logger.Error("shutdown", "error", err)
 	}
+}
+
+// loopbackHTTPBase returns an http://127.0.0.1:<port> URL for self-HTTP from handlers (benchmark → mimic routes).
+func loopbackHTTPBase(listenAddr string) string {
+	listenAddr = strings.TrimSpace(listenAddr)
+	if listenAddr == "" {
+		return "http://127.0.0.1:8080"
+	}
+	if !strings.Contains(listenAddr, ":") {
+		return "http://127.0.0.1:" + listenAddr
+	}
+	if strings.HasPrefix(listenAddr, ":") {
+		return "http://127.0.0.1" + listenAddr
+	}
+	host, port, err := net.SplitHostPort(listenAddr)
+	if err != nil {
+		return "http://127.0.0.1" + listenAddr
+	}
+	if host == "0.0.0.0" || host == "::" || host == "" {
+		return "http://127.0.0.1:" + port
+	}
+	return "http://" + net.JoinHostPort(host, port)
 }

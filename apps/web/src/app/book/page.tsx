@@ -279,7 +279,7 @@ export default function BookPage() {
       <div className="fixed inset-0 -z-10 bg-[radial-gradient(circle_at_0%_0%,_var(--tw-gradient-stops))] from-emerald-50/50 via-transparent to-transparent dark:from-emerald-950/20 pointer-events-none" />
       <div className="fixed top-0 right-0 -z-10 h-[500px] w-[500px] bg-emerald-200/10 blur-[120px] rounded-full dark:bg-emerald-500/5 pointer-events-none" />
       
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-12 px-6 py-16 relative z-10">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-6 py-16 relative z-10">
         {/* Minimalist Header */}
         <header className="flex flex-col gap-8 md:flex-row md:items-center md:justify-between">
           <motion.div 
@@ -324,8 +324,8 @@ export default function BookPage() {
 
         <ObservabilityLinks />
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
-          {/* Main Content Area */}
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-12 lg:gap-10">
+          {/* Slots + booking flow */}
           <div className="lg:col-span-7 space-y-8">
             <div className="flex items-center justify-between px-2">
               <h2 className="text-sm font-bold uppercase tracking-widest text-emerald-900/40 dark:text-white/40">Available Windows</h2>
@@ -434,91 +434,107 @@ export default function BookPage() {
                 </AnimatePresence>
               </div>
             </div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.12, duration: 0.4 }}
-              className="group relative overflow-hidden rounded-[2.5rem] border border-emerald-500/10 bg-white/60 p-8 shadow-sm backdrop-blur-md dark:bg-white/[0.04]"
-            >
-              {/* Subtle background glow */}
-              <div className="absolute -left-20 -top-20 h-64 w-64 rounded-full bg-emerald-500/5 blur-[100px] transition-colors group-hover:bg-emerald-500/10" />
-
-              <div className="relative z-10 mb-8 space-y-3">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-500/10 border border-emerald-500/10">
-                    <Activity className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-                  </div>
-                  <h2 className="text-xs font-black uppercase tracking-[0.2em] text-emerald-900/40 dark:text-white/40">
-                    Concurrent booking simulation
-                  </h2>
-                </div>
-                
-                <p className="text-muted-foreground max-w-xl text-sm leading-relaxed">
-                  Stress-test the same Go API and transactional path as{" "}
-                  <span className="text-emerald-950 dark:text-white font-bold">Reserve Slot</span>: the
-                  server creates temporary slots, then starts one goroutine per simulated booking.
-                  Those goroutines all call <code className="text-emerald-700 dark:text-emerald-400 font-mono text-xs font-bold">pgxpool.BeginTx</code>
-                  — but the pool only keeps a{" "}
-                  <span className="text-emerald-950 dark:text-white font-bold">fixed number of real Postgres
-                  connections</span>.
-                </p>
-              </div>
-
-              <BookingConcurrencyLab
-                resourceId={resourceId}
-                className="border-0 bg-transparent p-0"
-              />
-            </motion.div>
           </div>
 
-          {/* Sidebar Info */}
-          <aside className="lg:col-span-5 space-y-8">
-            <motion.div 
-              initial={{ opacity: 0, x: 20 }}
+          {/* Compact policy — reduced vertical footprint */}
+          <aside className="lg:col-span-5">
+            <motion.div
+              initial={{ opacity: 0, x: 16 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.3 }}
-              className="p-8 rounded-[2.5rem] bg-emerald-950 text-white dark:bg-emerald-900/40 border border-white/5 shadow-2xl relative overflow-hidden group"
+              transition={{ delay: 0.2 }}
+              className="group relative overflow-hidden rounded-2xl border border-white/10 bg-emerald-950 px-5 py-4 text-white shadow-xl dark:border-white/5 dark:bg-emerald-950/90"
             >
-              {/* Decorative elements */}
-              <div className="absolute top-0 right-0 -mr-16 -mt-16 h-64 w-64 bg-emerald-500/20 blur-[80px] rounded-full group-hover:bg-emerald-500/30 transition-colors duration-700" />
-              
-              <div className="relative z-10 space-y-6">
-                <div className="h-12 w-12 rounded-2xl bg-white/10 flex items-center justify-center border border-white/10">
-                  <BookOpen className="h-6 w-6 text-emerald-400" />
-                </div>
-                <div className="space-y-2">
-                  <h3 className="text-2xl font-bold tracking-tight">Booking Policy</h3>
-                  <p className="text-emerald-100/60 text-sm leading-relaxed">
-                    Reservations are processed in real-time by our Go-powered scheduling engine. Once confirmed, your slot is immediately locked.
-                  </p>
-                </div>
-                
-                <ul className="space-y-4">
-                  {[
-                    "Instant database persistence",
-                    "JWT-secured API endpoints",
-                    "Atomic slot locking",
-                    "Real-time conflict detection"
-                  ].map((item, idx) => (
-                    <li key={idx} className="flex items-center gap-3 text-sm font-medium text-emerald-100/80">
-                      <div className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                      {item}
-                    </li>
-                  ))}
-                </ul>
+              <div className="pointer-events-none absolute -right-10 -top-10 h-36 w-36 rounded-full bg-emerald-500/25 blur-[56px] transition-all duration-500 group-hover:bg-emerald-400/30" />
 
-                <Link 
-                  href="/application-architecture"
-                  className="group/btn inline-flex items-center gap-2 text-sm font-bold text-emerald-400 hover:text-emerald-300 transition-colors"
-                >
-                  Application Architecture
-                  <ChevronRight className="h-4 w-4 transition-transform group-hover/btn:translate-x-1" />
-                </Link>
+              <div className="relative z-10 flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-4">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/10">
+                  <BookOpen className="h-5 w-5 text-emerald-300" />
+                </div>
+                <div className="min-w-0 flex-1 space-y-2">
+                  <h3 className="font-display text-lg font-semibold leading-tight tracking-tight">
+                    Booking Policy
+                  </h3>
+                  <p className="text-xs leading-snug text-emerald-100/70">
+                    Go-backed scheduling: confirm once, slot locks immediately — JWT API, atomic row locks,
+                    conflict-safe writes.
+                  </p>
+                  <ul className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                    {[
+                      "Instant DB persistence",
+                      "JWT-secured routes",
+                      "Atomic slot lock",
+                      "Live conflict handling",
+                    ].map((item) => (
+                      <li
+                        key={item}
+                        className="flex items-center gap-2 text-[11px] font-medium leading-tight text-emerald-100/85"
+                      >
+                        <span className="h-1 w-1 shrink-0 rounded-full bg-emerald-400" aria-hidden />
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                  <Link
+                    href="/application-architecture"
+                    className="group/btn inline-flex items-center gap-1.5 pt-1 text-[11px] font-bold uppercase tracking-wide text-emerald-300 hover:text-emerald-200"
+                  >
+                    Architecture
+                    <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover/btn:translate-x-0.5" />
+                  </Link>
+                </div>
               </div>
             </motion.div>
           </aside>
         </div>
+
+        {/* Full-width lab — uses horizontal space */}
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.14, duration: 0.45 }}
+          className="group relative w-full overflow-hidden rounded-[2rem] border border-emerald-500/15 bg-white/70 p-6 shadow-sm backdrop-blur-md sm:p-8 lg:p-10 dark:bg-white/[0.05]"
+        >
+          <div className="pointer-events-none absolute -left-24 top-0 h-72 w-72 rounded-full bg-gradient-to-br from-emerald-400/15 via-cyan-400/5 to-transparent blur-3xl transition-opacity duration-700 group-hover:opacity-100 dark:from-emerald-500/10" />
+          <div className="pointer-events-none absolute bottom-0 right-0 h-48 w-48 rounded-full bg-emerald-500/5 blur-2xl" />
+
+          <div className="relative z-10 mb-8 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between lg:gap-10">
+            <div className="max-w-3xl space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-emerald-500/15 bg-emerald-500/10">
+                  <Activity className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                </div>
+                <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-emerald-800/55 dark:text-emerald-300/50">
+                  Concurrent booking simulation
+                </p>
+              </div>
+              <h2 className="font-display text-2xl font-semibold leading-snug tracking-tight text-emerald-950 sm:text-3xl dark:text-white">
+                Stress the same path as production—then watch goroutines move in Prometheus.
+              </h2>
+              <p className="text-base leading-relaxed text-muted-foreground">
+                Same Go transactional flow as{" "}
+                <span className="font-semibold text-emerald-950 dark:text-emerald-100">Reserve Slot</span>
+                : batch slots, parallel reserves, cleanup. Live{" "}
+                <code className="rounded-md bg-emerald-500/10 px-1.5 py-0.5 font-mono text-sm text-emerald-800 dark:text-emerald-300">
+                  go_goroutines
+                </code>{" "}
+                while the run is active. Compare runtimes in the accordion{" "}
+                <Link
+                  href="/application-architecture"
+                  className="font-medium text-emerald-700 underline decoration-emerald-500/30 underline-offset-4 hover:decoration-emerald-500 dark:text-emerald-300"
+                >
+                  Concurrency & pooling
+                </Link>
+                .
+              </p>
+            </div>
+            <p className="hidden shrink-0 text-right text-sm leading-snug text-muted-foreground/90 lg:block lg:max-w-[14rem]">
+              Higher <span className="font-mono font-semibold text-foreground">n</span> = more parallel work
+              queued behind the pgx pool—ideal for portfolio demos.
+            </p>
+          </div>
+
+          <BookingConcurrencyLab resourceId={resourceId} className="border-0 bg-transparent p-0" />
+        </motion.div>
 
         <div className="w-full min-w-0">
           <DbConnectionStatusPill />

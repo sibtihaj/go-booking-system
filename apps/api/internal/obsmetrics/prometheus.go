@@ -19,6 +19,10 @@ type Metrics struct {
 	ReservationsTotal *prometheus.CounterVec
 	BenchmarkRuns     *prometheus.CounterVec
 	HTTPRequests      *prometheus.CounterVec
+	// MimicEmailTotal / MimicWhatsAppTotal: demo-only “provider” calls; label code is HTTP status
+	// (e.g. "200", "429") or "client_error" when the outbound request fails before a response.
+	MimicEmailTotal    *prometheus.CounterVec
+	MimicWhatsAppTotal *prometheus.CounterVec
 }
 
 // New builds a dedicated registry with Go/process collectors, pgx pool gauges, goroutine gauge,
@@ -74,7 +78,7 @@ func New(pool *pgxpool.Pool) *Metrics {
 	reservations := prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "booking_reservations_total",
-			Help: "Reservation attempts by outcome (CreateReservation).",
+			Help: "Reservation attempts by outcome: POST /reservations and each successful/failed row in booking-rush benchmark (same ReserveConfirmedSlot path).",
 		},
 		[]string{"result"},
 	)
@@ -92,15 +96,33 @@ func New(pool *pgxpool.Pool) *Metrics {
 		},
 		[]string{"method", "code"},
 	)
+	mimicEmail := prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "booking_mimic_email_notifications_total",
+			Help: "Mimic email confirmation calls after a successful benchmark reservation (label code = HTTP status or client_error).",
+		},
+		[]string{"code"},
+	)
+	mimicWA := prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "booking_mimic_whatsapp_notifications_total",
+			Help: "Mimic WhatsApp notification calls after a successful benchmark reservation (label code = HTTP status or client_error).",
+		},
+		[]string{"code"},
+	)
 	reg.MustRegister(reservations)
 	reg.MustRegister(benchmark)
 	reg.MustRegister(httpReq)
+	reg.MustRegister(mimicEmail)
+	reg.MustRegister(mimicWA)
 
 	return &Metrics{
-		Registry:          reg,
-		ReservationsTotal: reservations,
-		BenchmarkRuns:     benchmark,
-		HTTPRequests:      httpReq,
+		Registry:           reg,
+		ReservationsTotal:  reservations,
+		BenchmarkRuns:      benchmark,
+		HTTPRequests:       httpReq,
+		MimicEmailTotal:    mimicEmail,
+		MimicWhatsAppTotal: mimicWA,
 	}
 }
 
@@ -143,4 +165,20 @@ func (m *Metrics) IncBenchmarkRun(result string) {
 		return
 	}
 	m.BenchmarkRuns.WithLabelValues(result).Inc()
+}
+
+// IncMimicEmail records one mimic email notification attempt (code = HTTP status as string or client_error).
+func (m *Metrics) IncMimicEmail(code string) {
+	if m == nil || m.MimicEmailTotal == nil {
+		return
+	}
+	m.MimicEmailTotal.WithLabelValues(code).Inc()
+}
+
+// IncMimicWhatsApp records one mimic WhatsApp notification attempt.
+func (m *Metrics) IncMimicWhatsApp(code string) {
+	if m == nil || m.MimicWhatsAppTotal == nil {
+		return
+	}
+	m.MimicWhatsAppTotal.WithLabelValues(code).Inc()
 }
