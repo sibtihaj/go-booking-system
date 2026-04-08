@@ -47,6 +47,23 @@ type BookingConcurrencyLabProps = {
   className?: string;
 };
 
+type SimulationSnapshot = {
+  runAtIso: string;
+  status: "succeeded" | "failed";
+  n: number;
+  reservationsOk?: number;
+  reservationsFail?: number;
+  totalMs?: number;
+  concurrentMs?: number;
+  cleanupMs?: number;
+  mimicEmailByCode?: Record<string, number>;
+  mimicWhatsappByCode?: Record<string, number>;
+  errorDetail?: string;
+};
+
+const LAST_SNAPSHOT_KEY = "booking_lab_last_simulation_snapshot";
+const LAST_SNAPSHOT_EVENT = "booking-lab:last-snapshot-updated";
+
 function formatLogTime(): string {
   const d = new Date();
   return d.toLocaleTimeString(undefined, {
@@ -67,6 +84,21 @@ function formatMimicCodeSummary(by: Record<string, number> | undefined): string 
     .sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true }))
     .map(([code, count]) => `${code}: ${count}`)
     .join(" · ");
+}
+
+function estimateGoMemoryMb(bookings: number): number {
+  // Rough demo heuristic: lightweight goroutine scheduling + shared runtime overhead.
+  return Math.max(120, Math.round(110 + bookings * 0.03));
+}
+
+function estimateNodeMemoryMb(bookings: number): number {
+  // Rough demo heuristic: async closures, buffers, queue pressure, and optional worker-thread overhead.
+  return Math.max(280, Math.round(260 + bookings * 0.12));
+}
+
+function formatMemoryLabel(mb: number): string {
+  if (mb >= 1024) return `${(mb / 1024).toFixed(1)} GB`;
+  return `${mb.toFixed(0)} MB`;
 }
 
 export function BookingConcurrencyLab({
@@ -94,6 +126,10 @@ export function BookingConcurrencyLab({
   const [goroutineBaseline, setGoroutineBaseline] = useState<number | null>(null);
   const [goroutinePeak, setGoroutinePeak] = useState<number | null>(null);
   const [metricsPollError, setMetricsPollError] = useState(false);
+  const [metricsPollingActive, setMetricsPollingActive] = useState(false);
+  const lastSuccessfulTotalMsRef = useRef<number | null>(null);
+  const goMemoryEstimateMb = estimateGoMemoryMb(n);
+  const nodeMemoryEstimateMb = estimateNodeMemoryMb(n);
 
   const clearSimulationTimers = useCallback(() => {
     if (timersRef.current.intervalId !== null) {
@@ -128,7 +164,7 @@ export function BookingConcurrencyLab({
   useEffect(() => () => clearSimulationTimers(), [clearSimulationTimers]);
 
   useEffect(() => {
-    if (!loading) return;
+    if (!metricsPollingActive) return;
     let cancelled = false;
     const tick = async () => {
       const n = await fetchGoGoroutinesFromMetrics();
@@ -146,12 +182,12 @@ export function BookingConcurrencyLab({
       setGoroutinePeak((p) => (p === null ? n : Math.max(p, n)));
     };
     void tick();
-    const id = window.setInterval(() => void tick(), 1200);
+    const id = window.setInterval(() => void tick(), 300);
     return () => {
       cancelled = true;
       clearInterval(id);
     };
-  }, [loading]);
+  }, [metricsPollingActive]);
 
   const run = useCallback(async () => {
     const count = Math.floor(Number(n));
@@ -171,6 +207,7 @@ export function BookingConcurrencyLab({
     metricsOkRef.current = false;
     setMetricsPollError(false);
     setLoading(true);
+    setMetricsPollingActive(true);
     setResult(null);
 
     appendLog(
@@ -194,8 +231,16 @@ export function BookingConcurrencyLab({
     setSimProgress(5);
 
     const startMs = Date.now();
-    // Heuristic: larger n tends to mean longer slot insert + concurrent phase (not exact).
-    const estimateMs = Math.min(120_000, 1_200 + count * 2.5);
+    // Heuristic estimate for perceived run progress; server timings are authoritative when response arrives.
+    const estimateMs = Math.min(
+      180_000,
+      Math.max(
+        4_000,
+        (lastSuccessfulTotalMsRef.current ?? 0) > 0
+          ? Math.round((lastSuccessfulTotalMsRef.current as number) * 1.2)
+          : 1_800 + count * 7,
+      ),
+    );
 
     const tryMilestone = (key: string, minPct: number, line: string) => {
       if (milestoneSeenRef.current.has(key)) return;
@@ -205,7 +250,12 @@ export function BookingConcurrencyLab({
 
     timersRef.current.intervalId = setInterval(() => {
       const elapsed = Date.now() - startMs;
-      const eased = Math.min(93, 8 + (elapsed / estimateMs) * 78);
+      let eased = 8 + (elapsed / estimateMs) * 88;
+      if (elapsed > estimateMs) {
+        const tail = (elapsed - estimateMs) / (estimateMs * 1.4);
+        eased = 96 + Math.min(3, tail * 3);
+      }
+      eased = Math.min(99, eased);
       setSimProgress((prev) => Math.max(prev, eased));
 
       if (eased >= 10) tryMilestone("post", 10, "Authenticated — POST /api/v1/benchmark/booking-rush");
@@ -236,6 +286,13 @@ export function BookingConcurrencyLab({
       if (eased >= 74)
         tryMilestone("cleanup", 74, "Server: cleanup — deleting benchmark slots and reservations…");
       if (eased >= 86) tryMilestone("json", 86, "Serializing JSON timings and outcome counts…");
+      if (eased >= 95) {
+        tryMilestone(
+          "finalizing",
+          95,
+          "Finalizing response (including mimic notification calls and metric flush)…",
+        );
+      }
     }, 180);
 
     try {
@@ -258,7 +315,26 @@ export function BookingConcurrencyLab({
       appendLog(
         `[100%] Response received — ok=${data.reservations_ok}, fail=${data.reservations_fail}, total=${data.total_ms.toFixed(1)}ms (slots ${data.slots_created_ms.toFixed(1)}ms · concurrent ${data.concurrent_phase_ms.toFixed(1)}ms · cleanup ${data.cleanup_ms.toFixed(1)}ms)`,
       );
+      lastSuccessfulTotalMsRef.current = data.total_ms;
       setResult(data);
+      const snapshot: SimulationSnapshot = {
+        runAtIso: new Date().toISOString(),
+        status: "succeeded",
+        n: data.n,
+        reservationsOk: data.reservations_ok,
+        reservationsFail: data.reservations_fail,
+        totalMs: data.total_ms,
+        concurrentMs: data.concurrent_phase_ms,
+        cleanupMs: data.cleanup_ms,
+        mimicEmailByCode: data.mimic_email_by_code,
+        mimicWhatsappByCode: data.mimic_whatsapp_by_code,
+      };
+      window.dispatchEvent(new CustomEvent<SimulationSnapshot>(LAST_SNAPSHOT_EVENT, { detail: snapshot }));
+      try {
+        window.localStorage.setItem(LAST_SNAPSHOT_KEY, JSON.stringify(snapshot));
+      } catch {
+        // Ignore storage quota/browser restrictions.
+      }
       toast.success("Simulation finished.");
       queueTraceReset(5000);
     } catch (e: unknown) {
@@ -277,10 +353,28 @@ export function BookingConcurrencyLab({
         appendLog("[error] Request failed — check API, database, and network.");
         toast.error("Simulation failed — check API and database.");
       }
+      const errorDetail =
+        err.status === 400 && err.body?.error === "n_too_large"
+          ? `n too large for this session (max ${String(err.body.max_n ?? "?")})`
+          : "Request failed";
+      const snapshot: SimulationSnapshot = {
+        runAtIso: new Date().toISOString(),
+        status: "failed",
+        n: count,
+        errorDetail,
+      };
+      window.dispatchEvent(new CustomEvent<SimulationSnapshot>(LAST_SNAPSHOT_EVENT, { detail: snapshot }));
+      try {
+        window.localStorage.setItem(LAST_SNAPSHOT_KEY, JSON.stringify(snapshot));
+      } catch {
+        // Ignore storage quota/browser restrictions.
+      }
       queueTraceReset(3500);
     } finally {
       setLoading(false);
       clearSimulationTimers();
+      const timeoutId = setTimeout(() => setMetricsPollingActive(false), 4500);
+      timersRef.current.timeouts.push(timeoutId);
     }
   }, [n, resourceId, appendLog, clearSimulationTimers, queueTraceReset]);
 
@@ -455,59 +549,90 @@ export function BookingConcurrencyLab({
                 </div>
 
                 <div
-                  className="rounded-2xl border border-cyan-500/25 bg-cyan-500/[0.07] p-5 dark:border-cyan-500/20 dark:bg-cyan-950/25"
+                  className="relative flex flex-col overflow-hidden rounded-[2rem] border border-cyan-500/20 bg-cyan-500/[0.03] p-8 dark:border-cyan-500/10 dark:bg-cyan-950/20"
                   aria-live="polite"
                 >
-                  <p className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-cyan-900/80 dark:text-cyan-200/90">
-                    Go runtime — live Prometheus{" "}
-                    <code className="font-mono font-semibold normal-case text-cyan-800 dark:text-cyan-100">
-                      go_goroutines
-                    </code>
-                  </p>
-                  {metricsPollError && liveGoroutines === null ? (
-                    <p className="text-sm leading-snug text-amber-800 dark:text-amber-400">
-                      Could not read <code className="font-mono text-xs">/metrics</code>. Use same-origin{" "}
-                      <code className="font-mono text-xs">/booking-api-metrics</code> or allow CORS on the
-                      API for GET /metrics.
-                    </p>
-                  ) : (
-                    <div className="flex flex-wrap gap-x-5 gap-y-2 font-mono text-sm text-emerald-950 dark:text-emerald-50">
-                      <span>
-                        <span className="text-muted-foreground">Current</span>{" "}
-                        <strong className="tabular-nums text-lg">
-                          {loading && liveGoroutines === null ? "…" : liveGoroutines ?? "—"}
-                        </strong>
-                      </span>
-                      {goroutineBaseline !== null && (
-                        <span>
-                          <span className="text-muted-foreground">Baseline</span>{" "}
-                          <strong className="tabular-nums">{goroutineBaseline}</strong>
-                        </span>
-                      )}
-                      {liveGoroutines !== null && goroutineBaseline !== null && (
-                        <span>
-                          <span className="text-muted-foreground">Δ</span>{" "}
-                          <strong className="tabular-nums text-cyan-700 dark:text-cyan-300">
-                            {liveGoroutines >= goroutineBaseline ? "+" : ""}
-                            {liveGoroutines - goroutineBaseline}
-                          </strong>
-                        </span>
-                      )}
-                      {goroutinePeak !== null && (
-                        <span>
-                          <span className="text-muted-foreground">Peak</span>{" "}
-                          <strong className="tabular-nums text-emerald-700 dark:text-emerald-400">
-                            {goroutinePeak}
-                          </strong>
-                        </span>
-                      )}
+                  {/* Decorative Background Elements */}
+                  <div className="absolute -right-12 -top-12 h-64 w-64 rounded-full bg-cyan-500/10 blur-[80px] pointer-events-none" />
+                  <div className="absolute -left-12 -bottom-12 h-48 w-48 rounded-full bg-emerald-500/5 blur-[60px] pointer-events-none" />
+                  
+                  <div className="relative z-10 flex flex-col h-full">
+                    <div className="flex items-center justify-between mb-10">
+                      <div className="space-y-1">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-cyan-900/60 dark:text-cyan-400/60">
+                          Live Telemetry
+                        </p>
+                        <h3 className="font-display text-lg font-bold tracking-tight text-cyan-950 dark:text-cyan-50">
+                          Go Goroutines
+                        </h3>
+                      </div>
+                      <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20">
+                        <div className="h-1.5 w-1.5 rounded-full bg-cyan-500 animate-pulse" />
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-700 dark:text-cyan-400">Real-time</span>
+                      </div>
                     </div>
-                  )}
-                  <p className="mt-4 text-xs leading-relaxed text-muted-foreground">
-                    Process-wide goroutine count. During the concurrent phase the server starts{" "}
-                    <span className="font-medium text-foreground">one goroutine per simulated booking</span>
-                    ; expect a bump, then a drop after cleanup. Polled ~every 1.2s.
-                  </p>
+
+                    {metricsPollError && liveGoroutines === null ? (
+                      <div className="flex-1 flex items-center justify-center p-8 rounded-2xl bg-amber-500/5 border border-amber-500/10">
+                        <p className="text-sm text-center leading-relaxed text-amber-800 dark:text-amber-400">
+                          Telemetry unavailable. Ensure <code className="font-mono text-xs">/metrics</code> is accessible.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="flex-1 grid grid-cols-2 gap-5">
+                        <div className="flex min-h-[140px] flex-col justify-between rounded-2xl border border-cyan-500/15 bg-white/35 p-5 dark:bg-cyan-950/20">
+                          <p className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">Current</p>
+                          <span className="font-display text-5xl font-extrabold tabular-nums tracking-tight text-cyan-600 dark:text-cyan-400">
+                            {loading && liveGoroutines === null ? "—" : liveGoroutines ?? "0"}
+                          </span>
+                        </div>
+
+                        <div className="flex min-h-[140px] flex-col justify-between rounded-2xl border border-cyan-500/15 bg-white/35 p-5 dark:bg-cyan-950/20">
+                          <p className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">Baseline</p>
+                          <span className="font-display text-5xl font-extrabold tabular-nums tracking-tight text-foreground/75">
+                            {goroutineBaseline ?? "0"}
+                          </span>
+                        </div>
+
+                        <div className="flex min-h-[140px] flex-col justify-between rounded-2xl border border-cyan-500/15 bg-white/35 p-5 dark:bg-cyan-950/20">
+                          <p className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">Variance</p>
+                          <span
+                            className={cn(
+                              "font-display text-5xl font-extrabold tabular-nums tracking-tight",
+                              liveGoroutines !== null && goroutineBaseline !== null && liveGoroutines > goroutineBaseline
+                                ? "text-cyan-600 dark:text-cyan-400"
+                                : "text-foreground/75",
+                            )}
+                          >
+                            {liveGoroutines !== null && goroutineBaseline !== null ? (
+                              <>
+                                {liveGoroutines >= goroutineBaseline ? "+" : ""}
+                                {liveGoroutines - goroutineBaseline}
+                              </>
+                            ) : "0"}
+                          </span>
+                        </div>
+
+                        <div className="flex min-h-[140px] flex-col justify-between rounded-2xl border border-cyan-500/15 bg-white/35 p-5 dark:bg-cyan-950/20">
+                          <p className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">Peak</p>
+                          <span className="font-display text-5xl font-extrabold tabular-nums tracking-tight text-emerald-600 dark:text-emerald-400">
+                            {goroutinePeak ?? "0"}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="mt-12 pt-6 border-t border-cyan-500/10">
+                      <div className="flex items-start gap-3">
+                        <Info className="h-3.5 w-3.5 mt-0.5 text-cyan-500/40 shrink-0" />
+                        <p className="text-[11px] leading-relaxed text-muted-foreground/80 italic">
+                          Process-wide goroutine count. During concurrency, the server spawns{" "}
+                          <span className="font-bold text-cyan-900/80 dark:text-cyan-100/80 not-italic">one goroutine per simulated booking</span>.
+                          Expect a burst, then a rapid drop after cleanup.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </motion.div>
@@ -518,33 +643,19 @@ export function BookingConcurrencyLab({
           <Info className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500/60" />
           <div className="space-y-2">
             <p>
-              <span className="font-semibold text-emerald-950 dark:text-emerald-100">
-                How this simulation maps to the server:
-              </span>{" "}
-              The API inserts <code className="rounded bg-emerald-500/10 px-1 font-mono text-xs">n</code>{" "}
-              slots in one transaction, then starts{" "}
-              <strong className="text-emerald-900 dark:text-emerald-200">
-                exactly one goroutine per booking
-              </strong>{" "}
-              for the concurrent phase—each runs the same transactional reserve path as production.
-              It then deletes those rows so nothing is left in the database. After each successful
-              reservation, the API issues parallel mimic &ldquo;email&rdquo; and &ldquo;WhatsApp&rdquo;
-              HTTP calls (tracked in Prometheus / Grafana).{" "}
-              <strong className="text-emerald-900 dark:text-emerald-200">
-                N goroutines does not mean N simultaneous Postgres sessions
-              </strong>
-              : <code className="rounded bg-emerald-500/10 px-1 font-mono text-xs">pgxpool</code> caps
-              connections; extra goroutines block on{" "}
-              <code className="rounded bg-emerald-500/10 px-1 font-mono text-xs">Acquire()</code>.
-              Results include{" "}
-              <code className="font-mono text-xs font-bold text-emerald-700 dark:text-emerald-400">
-                db_max_conns
-              </code>
-              . Browser cap {MAX_UI}. For a Go vs Node comparison, see the accordion{" "}
-              <span className="font-medium text-foreground">
-                Concurrency, pooling, and why the booking engine is Go (not Node)
-              </span>{" "}
-              below.
+              <span className="font-semibold text-emerald-950 dark:text-emerald-100">For {n.toLocaleString()} parallel booking attempts:</span>{" "}
+              a Go-style worker model is typically around{" "}
+              <strong className="text-emerald-900 dark:text-emerald-200">{formatMemoryLabel(goMemoryEstimateMb)}</strong>{" "}
+              runtime memory in this demo profile, while a Node.js-only architecture handling the same burst
+              (Promises, queue pressure, and optional worker-thread fan-out) is typically closer to{" "}
+              <strong className="text-emerald-900 dark:text-emerald-200">{formatMemoryLabel(nodeMemoryEstimateMb)}</strong>.
+            </p>
+            <p>
+              Even with higher DB pool sizes in Node.js, common drawbacks under heavy bursts are: event-loop
+              backpressure, slower tail latency as in-flight objects accumulate, and higher memory per
+              concurrent unit of work. This comparison is{" "}
+              <span className="font-medium text-foreground">an architectural estimate, not a measured benchmark</span>.
+              Your real numbers depend on payload size, logging, retries, and deployment tier.
             </p>
           </div>
         </div>
@@ -643,6 +754,129 @@ export function BookingConcurrencyLab({
           </motion.div>
         )}
       </AnimatePresence>
+
     </div>
+  );
+}
+
+export function LastSimulationSnapshotCard({ className }: { className?: string }) {
+  const [lastSnapshot, setLastSnapshot] = useState<SimulationSnapshot | null>(null);
+
+  const applySnapshot = useCallback((snapshot: SimulationSnapshot | null) => {
+    setLastSnapshot(snapshot);
+  }, []);
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(LAST_SNAPSHOT_KEY);
+      if (!raw) return;
+      applySnapshot(JSON.parse(raw) as SimulationSnapshot);
+    } catch {
+      // Ignore storage parse errors.
+    }
+  }, [applySnapshot]);
+
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== LAST_SNAPSHOT_KEY || !event.newValue) return;
+      try {
+        applySnapshot(JSON.parse(event.newValue) as SimulationSnapshot);
+      } catch {
+        // Ignore malformed data.
+      }
+    };
+    const onSnapshotUpdated = (event: Event) => {
+      const custom = event as CustomEvent<SimulationSnapshot>;
+      if (!custom.detail) return;
+      applySnapshot(custom.detail);
+    };
+    window.addEventListener("storage", onStorage);
+    window.addEventListener(LAST_SNAPSHOT_EVENT, onSnapshotUpdated as EventListener);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener(LAST_SNAPSHOT_EVENT, onSnapshotUpdated as EventListener);
+    };
+  }, [applySnapshot]);
+
+  if (!lastSnapshot) {
+    return (
+      <section className={cn("rounded-2xl border border-emerald-500/15 bg-white/55 p-5 dark:bg-white/[0.05]", className)}>
+        <h4 className="font-display text-lg font-semibold tracking-tight text-emerald-950 dark:text-emerald-100">
+          Last simulation snapshot
+        </h4>
+        <p className="mt-2 text-sm text-muted-foreground">
+          No simulation has completed yet. Run the benchmark to populate this card.
+        </p>
+      </section>
+    );
+  }
+
+  return (
+    <section className={cn("rounded-2xl border border-emerald-500/15 bg-white/55 p-5 dark:bg-white/[0.05]", className)}>
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="space-y-1">
+          <h4 className="font-display text-lg font-semibold tracking-tight text-emerald-950 dark:text-emerald-100">
+            Last simulation snapshot
+          </h4>
+          <p className="text-xs text-muted-foreground">{new Date(lastSnapshot.runAtIso).toLocaleString()}</p>
+        </div>
+        <span
+          className={cn(
+            "rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide",
+            lastSnapshot.status === "succeeded"
+              ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+              : "bg-red-500/15 text-red-700 dark:text-red-300",
+          )}
+        >
+          {lastSnapshot.status}
+        </span>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="rounded-xl border border-emerald-500/10 bg-emerald-500/[0.04] p-3">
+          <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Bookings (n)</p>
+          <p className="font-mono text-2xl font-bold tabular-nums">{lastSnapshot.n}</p>
+        </div>
+        <div className="rounded-xl border border-emerald-500/10 bg-emerald-500/[0.04] p-3">
+          <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Success / Failed</p>
+          <p className="font-mono text-2xl font-bold tabular-nums">
+            {lastSnapshot.reservationsOk ?? "—"} / {lastSnapshot.reservationsFail ?? "—"}
+          </p>
+        </div>
+        <div className="rounded-xl border border-emerald-500/10 bg-emerald-500/[0.04] p-3">
+          <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Concurrent phase</p>
+          <p className="font-mono text-2xl font-bold tabular-nums">
+            {typeof lastSnapshot.concurrentMs === "number" ? `${lastSnapshot.concurrentMs.toFixed(1)}ms` : "—"}
+          </p>
+        </div>
+        <div className="rounded-xl border border-emerald-500/10 bg-emerald-500/[0.04] p-3">
+          <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Total</p>
+          <p className="font-mono text-2xl font-bold tabular-nums">
+            {typeof lastSnapshot.totalMs === "number" ? `${lastSnapshot.totalMs.toFixed(1)}ms` : "—"}
+          </p>
+        </div>
+      </div>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <div className="rounded-xl border border-sky-500/20 bg-sky-500/[0.08] p-3">
+          <p className="text-[11px] uppercase tracking-wider text-sky-900/80 dark:text-sky-300/90">
+            Mimic email status
+          </p>
+          <p className="font-mono text-sm">{formatMimicCodeSummary(lastSnapshot.mimicEmailByCode)}</p>
+        </div>
+        <div className="rounded-xl border border-violet-500/20 bg-violet-500/[0.08] p-3">
+          <p className="text-[11px] uppercase tracking-wider text-violet-900/80 dark:text-violet-300/90">
+            Mimic WhatsApp status
+          </p>
+          <p className="font-mono text-sm">{formatMimicCodeSummary(lastSnapshot.mimicWhatsappByCode)}</p>
+        </div>
+      </div>
+      {lastSnapshot.errorDetail && (
+        <p className="mt-3 text-xs text-red-700 dark:text-red-300">
+          Last run error: {lastSnapshot.errorDetail}
+        </p>
+      )}
+      <p className="mt-3 text-xs text-muted-foreground">
+        Source: latest benchmark API response in this browser session (persisted in local storage).
+      </p>
+    </section>
   );
 }

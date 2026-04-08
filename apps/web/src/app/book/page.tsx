@@ -17,7 +17,7 @@ import {
 } from "@/components/booking/booking-extras";
 import { ShowcaseAccordion } from "@/components/showcase/showcase-accordion";
 import { bookShowcaseSections } from "@/content/showcase";
-import { BookingConcurrencyLab } from "@/components/booking/booking-concurrency-lab";
+import { BookingConcurrencyLab, LastSimulationSnapshotCard } from "@/components/booking/booking-concurrency-lab";
 import { ObservabilityLinks } from "@/components/booking/observability-links";
 import { cn } from "@/lib/utils";
 
@@ -540,6 +540,15 @@ export default function BookPage() {
           </div>
 
           <BookingConcurrencyLab resourceId={resourceId} className="border-0 bg-transparent p-0" />
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.18, duration: 0.45 }}
+          className="w-full"
+        >
+          <LastSimulationSnapshotCard />
         </motion.div>
 
         <div className="w-full min-w-0">
