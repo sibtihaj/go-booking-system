@@ -13,6 +13,7 @@ flowchart TB
 
   subgraph nx["Edge / SSR"]
     MW["Middleware and SSR — session cookies"]
+    OPROXY["Observability rewrites (/grafana-dashboard, /prometheus-dashboard)"]
   end
 
   subgraph sp["Supabase Platform"]
@@ -39,6 +40,9 @@ flowchart TB
   API -->|"exposes runtime/app metrics"| METRICS
   PROM -->|"scrapes /metrics"| METRICS
   GRAFANA -->|"PromQL queries"| PROM
+  UI -->|"open observability from app domain"| OPROXY
+  OPROXY -->|"proxy traffic"| GRAFANA
+  OPROXY -->|"proxy traffic"| PROM
 
   classDef cxFill fill:#ecfdf5,stroke:#10b981,color:#064e3b
   classDef nxFill fill:#f0f9ff,stroke:#0ea5e9,color:#0c4a6e
@@ -48,6 +52,7 @@ flowchart TB
 
   class UI cxFill
   class MW nxFill
+  class OPROXY nxFill
   class AUTH sxFill
   class DB sxFill
   class API gxFill

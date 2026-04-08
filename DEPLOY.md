@@ -28,6 +28,8 @@ A small observability stack ships in the repo under `[observability/](observabil
 
 **Railway:** The sample config in `[observability/railway/prometheus/prometheus.yml](observability/railway/prometheus/prometheus.yml)` scrapes the Go API at **`your-service-name.railway.internal:8080`**. Prometheus uses `http` and defaults omitted ports to **80**, so the scrape target must include the same port the API listens on (Railway’s `PORT`, usually `8080`). If Grafana shows an empty dashboard but Prometheus is up, check **Status → Targets** in the Prometheus UI and align the hostname with your Railway service name.
 
+If the Prometheus container restarts with `queries.active: permission denied`, deploy with the Dockerfile in `observability/railway/prometheus` (it sets `--storage.tsdb.path=/tmp/prometheus` to avoid permission issues from attached Railway volumes).
+
 ### Same hostname on Vercel (optional)
 
 The Next.js app can **proxy** paths to Grafana, Prometheus, and the raw metrics endpoint using **`rewrites`** in `[apps/web/next.config.ts](apps/web/next.config.ts)`. Set these in the Vercel project (and optionally in `.env.local` for local `next dev`):

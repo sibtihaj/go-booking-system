@@ -79,7 +79,8 @@ export default function DeploymentArchitecturePage() {
             </div>
             <CardDescription className="text-pretty">
               Frontend runs on Vercel, backend services run on Railway (Go API, Prometheus,
-              Grafana), and Supabase provides Auth + Postgres.
+              Grafana), and Supabase provides Auth + Postgres. This diagram focuses on metrics flow
+              (Prometheus/Grafana), not centralized log shipping.
             </CardDescription>
             <div className="pt-2">
               <Button

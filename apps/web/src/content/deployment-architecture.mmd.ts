@@ -7,6 +7,7 @@ flowchart TB
 
   subgraph vercel["Vercel"]
     WEB["Next.js Frontend"]
+    VPROXY["Vercel rewrites: /grafana-dashboard, /prometheus-dashboard"]
   end
 
   subgraph supa["Supabase Cloud"]
@@ -16,6 +17,7 @@ flowchart TB
 
   subgraph railway["Railway"]
     GO["Go API Service"]
+    MET["Go /metrics endpoint"]
     PROM["Prometheus Container"]
     GRAF["Grafana Container"]
   end
@@ -25,10 +27,12 @@ flowchart TB
   WEB -->|"Bearer JWT + API calls"| GO
   GO -->|"OIDC/JWKS verification"| SAUTH
   GO -->|"SQL over pgx"| SDB
-  GO -->|"exposes /metrics"| PROM
+  GO -->|"exports Prometheus counters/gauges"| MET
+  PROM -->|"scrapes /metrics"| MET
   GRAF -->|"PromQL dashboards"| PROM
-  WEB -->|"embedded/proxied observability links"| GRAF
-  WEB -->|"prometheus UI link"| PROM
+  USER -->|"open observability pages via app domain"| VPROXY
+  VPROXY -->|"proxy to Railway Grafana"| GRAF
+  VPROXY -->|"proxy to Railway Prometheus"| PROM
 
   classDef userFill fill:#ecfeff,stroke:#0891b2,color:#164e63
   classDef vercelFill fill:#ecfdf5,stroke:#10b981,color:#065f46
@@ -37,9 +41,11 @@ flowchart TB
 
   class USER userFill
   class WEB vercelFill
+  class VPROXY vercelFill
   class SAUTH supaFill
   class SDB supaFill
   class GO railFill
+  class MET railFill
   class PROM railFill
   class GRAF railFill
 `.trim();

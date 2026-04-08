@@ -98,7 +98,8 @@ export default function ApplicationArchitecturePage() {
               How the browser, Next.js, Supabase (Auth + Postgres), and the Go API exchange requests.
               The Go service never sees the Supabase anon key—only the user&apos;s{" "}
               <code className="font-mono text-xs">access_token</code> as a Bearer JWT, verified against
-              the Auth issuer (JWKS).
+              the Auth issuer (JWKS). Observability in this diagram represents metrics scrape/query
+              flow (Prometheus/Grafana), not centralized logs.
             </CardDescription>
             <div className="pt-2">
               <Button
