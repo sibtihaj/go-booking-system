@@ -169,7 +169,7 @@
     },
     {
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "description": "Cumulative counter by HTTP status (resets if the API process restarts). Short bursts do not show well with rate(…[5m]) until enough samples exist — this panel steps up as scrapes observe new totals.",
+      "description": "New mimic email calls per minute by HTTP status. Uses increase over a rolling window so idle periods fall back toward zero.",
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
@@ -192,17 +192,17 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "sum by (code) (booking_mimic_email_notifications_total)",
+          "expr": "sum by (code) (increase(booking_mimic_email_notifications_total[1m]))",
           "legendFormat": "HTTP {{code}}",
           "refId": "A"
         }
       ],
-      "title": "Mimic email confirmations — count by HTTP status (demo)",
+      "title": "Mimic email confirmations — new calls/min by HTTP status (demo)",
       "type": "timeseries"
     },
     {
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "description": "Cumulative counter by HTTP status (same as email panel).",
+      "description": "New mimic WhatsApp calls per minute by HTTP status. Idle periods should show near-zero.",
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
@@ -225,12 +225,12 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "sum by (code) (booking_mimic_whatsapp_notifications_total)",
+          "expr": "sum by (code) (increase(booking_mimic_whatsapp_notifications_total[1m]))",
           "legendFormat": "HTTP {{code}}",
           "refId": "A"
         }
       ],
-      "title": "Mimic WhatsApp notifications — count by HTTP status (demo)",
+      "title": "Mimic WhatsApp notifications — new calls/min by HTTP status (demo)",
       "type": "timeseries"
     }
   ],

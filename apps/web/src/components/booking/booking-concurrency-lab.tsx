@@ -12,6 +12,10 @@ import { Loader2, Zap, Cpu, Activity, Info, Terminal } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { fetchGoGoroutinesFromMetrics } from "@/lib/prometheus-text";
+import {
+  ObservabilityNavButtons,
+  showObservabilityNav,
+} from "@/components/observability-nav-buttons";
 
 type BenchmarkResponse = {
   n: number;
@@ -22,9 +26,14 @@ type BenchmarkResponse = {
   total_ms: number;
   reservations_ok: number;
   reservations_fail: number;
+  server_peak_goroutines?: number;
   db_max_conns: number;
   allowed_max_n: number;
   note: string;
+  mimic_dispatch_enabled?: boolean;
+  mimic_auth_header_present?: boolean;
+  mimic_email_total?: number;
+  mimic_whatsapp_total?: number;
   /** Counts per HTTP status (or client_error) for demo mimic email POSTs after each successful commit. */
   mimic_email_by_code?: Record<string, number>;
   /** Counts per HTTP status for demo mimic WhatsApp POSTs. */
@@ -58,6 +67,11 @@ type SimulationSnapshot = {
   cleanupMs?: number;
   mimicEmailByCode?: Record<string, number>;
   mimicWhatsappByCode?: Record<string, number>;
+  serverPeakGoroutines?: number;
+  mimicDispatchEnabled?: boolean;
+  mimicAuthHeaderPresent?: boolean;
+  mimicEmailTotal?: number;
+  mimicWhatsappTotal?: number;
   errorDetail?: string;
 };
 
@@ -155,6 +169,23 @@ export function BookingConcurrencyLab({
       { id: makeId(), ts: formatLogTime(), line },
     ]);
   }, []);
+
+  const resetSimulation = useCallback(() => {
+    clearSimulationTimers();
+    setLoading(false);
+    setMetricsPollingActive(false);
+    setResult(null);
+    setSimProgress(0);
+    setSimLogs([]);
+    setRunState("idle");
+    setLiveGoroutines(null);
+    setGoroutineBaseline(null);
+    setGoroutinePeak(null);
+    metricsOkRef.current = false;
+    setMetricsPollError(false);
+    milestoneSeenRef.current = new Set();
+    toast.message("Simulation reset");
+  }, [clearSimulationTimers]);
 
   useEffect(() => {
     if (!loading || simLogs.length === 0) return;
@@ -326,6 +357,11 @@ export function BookingConcurrencyLab({
         totalMs: data.total_ms,
         concurrentMs: data.concurrent_phase_ms,
         cleanupMs: data.cleanup_ms,
+        serverPeakGoroutines: data.server_peak_goroutines,
+        mimicDispatchEnabled: data.mimic_dispatch_enabled,
+        mimicAuthHeaderPresent: data.mimic_auth_header_present,
+        mimicEmailTotal: data.mimic_email_total,
+        mimicWhatsappTotal: data.mimic_whatsapp_total,
         mimicEmailByCode: data.mimic_email_by_code,
         mimicWhatsappByCode: data.mimic_whatsapp_by_code,
       };
@@ -459,31 +495,53 @@ export function BookingConcurrencyLab({
             </p>
           </div>
 
-          <Button
-            type="button"
-            size="lg"
-            onClick={() => void run()}
-            disabled={loading}
-            className={cn(
-              "h-14 min-w-[12rem] shrink-0 cursor-pointer rounded-2xl px-8 font-display text-base font-semibold shadow-lg transition-all duration-300 disabled:cursor-not-allowed",
-              loading
-                ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200"
-                : "bg-emerald-600 text-white shadow-emerald-600/25 hover:bg-emerald-500 hover:shadow-emerald-600/40",
-            )}
-          >
-            {loading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Running…
-              </>
-            ) : (
-              <>
-                <Zap className="mr-2 h-4 w-4 fill-current" />
-                Run Simulation
-              </>
-            )}
-          </Button>
+          <div className="flex shrink-0 flex-col gap-3 sm:flex-row lg:flex-col">
+            <Button
+              type="button"
+              size="lg"
+              onClick={() => void run()}
+              disabled={loading}
+              className={cn(
+                "h-14 min-w-[12rem] cursor-pointer rounded-2xl px-8 font-display text-base font-semibold shadow-lg transition-all duration-300 disabled:cursor-not-allowed",
+                loading
+                  ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200"
+                  : "bg-emerald-600 text-white shadow-emerald-600/25 hover:bg-emerald-500 hover:shadow-emerald-600/40",
+              )}
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Running…
+                </>
+              ) : (
+                <>
+                  <Zap className="mr-2 h-4 w-4 fill-current" />
+                  Run Simulation
+                </>
+              )}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={resetSimulation}
+              disabled={loading && runState === "running"}
+              className="h-12 min-w-[12rem] rounded-2xl border-emerald-500/20 bg-white/65 text-sm font-semibold text-emerald-900 hover:bg-emerald-500/[0.08] dark:bg-black/20 dark:text-emerald-100"
+            >
+              Reset simulation
+            </Button>
+          </div>
         </div>
+
+        {showObservabilityNav() && (
+          <div className="relative z-10 mt-6 rounded-2xl border border-emerald-500/12 bg-white/45 p-4 dark:bg-white/[0.03]">
+            <p className="mb-2 text-xs uppercase tracking-wider text-muted-foreground">
+              Observability shortcuts (open in new tabs)
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <ObservabilityNavButtons variant="card" />
+            </div>
+          </div>
+        )}
 
         <AnimatePresence>
           {(loading || simLogs.length > 0) && (
@@ -494,7 +552,7 @@ export function BookingConcurrencyLab({
               className="relative z-10 mt-8 overflow-hidden"
             >
               <div className="grid gap-6 xl:grid-cols-2 xl:gap-8">
-                <div className="min-w-0 space-y-4">
+                <div className="min-w-0 flex h-full flex-col gap-4">
                   <div className="flex items-center justify-between gap-3 text-sm font-semibold text-emerald-900/85 dark:text-emerald-100/90">
                     <span className="flex items-center gap-2">
                       <Terminal className="h-4 w-4 shrink-0 opacity-75" />
@@ -528,7 +586,7 @@ export function BookingConcurrencyLab({
                   </p>
 
                   <div
-                    className="max-h-56 overflow-y-auto rounded-2xl border border-emerald-500/15 bg-emerald-950/[0.04] p-4 font-mono text-xs leading-relaxed text-emerald-950/95 shadow-inner sm:max-h-64 dark:bg-black/35 dark:text-emerald-100/90"
+                    className="h-[360px] overflow-y-auto rounded-2xl border border-emerald-500/15 bg-emerald-950/[0.04] p-4 font-mono text-xs leading-relaxed text-emerald-950/95 shadow-inner xl:h-[500px] dark:bg-black/35 dark:text-emerald-100/90"
                     role="log"
                     aria-live="polite"
                     aria-relevant="additions"
@@ -691,10 +749,20 @@ export function BookingConcurrencyLab({
                 </div>
               </div>
               <div className="mt-4 flex items-center justify-between border-t border-emerald-500/5 pt-4">
-                <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground/70">
-                  Pool width
-                </span>
-                <span className="font-mono text-sm font-bold">{result.db_max_conns} conns</span>
+                <div className="flex w-full items-center justify-between gap-4 text-xs font-bold uppercase tracking-wider text-muted-foreground/70">
+                  <span>Pool width</span>
+                  <span className="font-mono text-sm font-bold normal-case text-foreground">{result.db_max_conns} conns</span>
+                </div>
+              </div>
+              <div className="mt-2 flex items-center justify-between border-t border-emerald-500/5 pt-2">
+                <div className="flex w-full items-center justify-between gap-4 text-xs font-bold uppercase tracking-wider text-muted-foreground/70">
+                  <span>Server peak goroutines</span>
+                  <span className="font-mono text-sm font-bold normal-case text-foreground">
+                    {typeof result.server_peak_goroutines === "number"
+                      ? result.server_peak_goroutines
+                      : "—"}
+                  </span>
+                </div>
               </div>
             </div>
 
@@ -732,6 +800,9 @@ export function BookingConcurrencyLab({
                 <p className="mb-2 text-xs font-bold uppercase tracking-widest text-sky-900/75 dark:text-sky-300/85">
                   Mimic email (HTTP status mix)
                 </p>
+                <p className="mb-2 font-mono text-base font-bold text-foreground/95">
+                  Total: {result.mimic_email_total ?? 0}
+                </p>
                 <p className="font-mono text-sm leading-relaxed text-foreground/95">
                   {formatMimicCodeSummary(result.mimic_email_by_code)}
                 </p>
@@ -740,6 +811,9 @@ export function BookingConcurrencyLab({
                 <p className="mb-2 text-xs font-bold uppercase tracking-widest text-violet-900/75 dark:text-violet-300/85">
                   Mimic WhatsApp (HTTP status mix)
                 </p>
+                <p className="mb-2 font-mono text-base font-bold text-foreground/95">
+                  Total: {result.mimic_whatsapp_total ?? 0}
+                </p>
                 <p className="font-mono text-sm leading-relaxed text-foreground/95">
                   {formatMimicCodeSummary(result.mimic_whatsapp_by_code)}
                 </p>
@@ -747,6 +821,9 @@ export function BookingConcurrencyLab({
             </div>
 
             <div className="sm:col-span-2 rounded-2xl border border-emerald-500/10 bg-emerald-950/[0.06] p-4 dark:bg-white/[0.04]">
+              <p className="mb-2 text-xs font-mono text-muted-foreground">
+                mimic_dispatch_enabled={String(result.mimic_dispatch_enabled ?? false)} · mimic_auth_header_present={String(result.mimic_auth_header_present ?? false)}
+              </p>
               <p className="text-sm italic leading-relaxed text-muted-foreground">
                 &ldquo;{result.note}&rdquo;
               </p>
@@ -852,6 +929,20 @@ export function LastSimulationSnapshotCard({ className }: { className?: string }
           <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Total</p>
           <p className="font-mono text-2xl font-bold tabular-nums">
             {typeof lastSnapshot.totalMs === "number" ? `${lastSnapshot.totalMs.toFixed(1)}ms` : "—"}
+          </p>
+        </div>
+        <div className="rounded-xl border border-emerald-500/10 bg-emerald-500/[0.04] p-3 sm:col-span-2 lg:col-span-4">
+          <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Server peak goroutines</p>
+          <p className="font-mono text-2xl font-bold tabular-nums">
+            {typeof lastSnapshot.serverPeakGoroutines === "number"
+              ? lastSnapshot.serverPeakGoroutines
+              : "—"}
+          </p>
+        </div>
+        <div className="rounded-xl border border-emerald-500/10 bg-emerald-500/[0.04] p-3 sm:col-span-2 lg:col-span-4">
+          <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Mimic dispatch diagnostics</p>
+          <p className="font-mono text-sm leading-relaxed">
+            enabled={String(lastSnapshot.mimicDispatchEnabled ?? false)} · auth_header={String(lastSnapshot.mimicAuthHeaderPresent ?? false)} · email_total={lastSnapshot.mimicEmailTotal ?? 0} · whatsapp_total={lastSnapshot.mimicWhatsappTotal ?? 0}
           </p>
         </div>
       </div>

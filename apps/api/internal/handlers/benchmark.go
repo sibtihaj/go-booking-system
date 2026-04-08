@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -33,12 +34,17 @@ type BenchmarkBookingRushResponse struct {
 	TotalMs           float64 `json:"total_ms"`
 	ReservationsOK    int64   `json:"reservations_ok"`
 	ReservationsFail  int64   `json:"reservations_fail"`
+	ServerPeakGoroutines int64 `json:"server_peak_goroutines"`
 	DBMaxConns        int32   `json:"db_max_conns"`
 	AllowedMaxN       int     `json:"allowed_max_n"`
 	Note              string  `json:"note"`
 	// Mimic* summarize HTTP calls to demo notification endpoints (same process); keys are status codes as strings.
 	MimicEmailByCode    map[string]int64 `json:"mimic_email_by_code,omitempty"`
 	MimicWhatsAppByCode map[string]int64 `json:"mimic_whatsapp_by_code,omitempty"`
+	MimicDispatchEnabled bool `json:"mimic_dispatch_enabled"`
+	MimicAuthHeaderPresent bool `json:"mimic_auth_header_present"`
+	MimicEmailTotal int64 `json:"mimic_email_total"`
+	MimicWhatsAppTotal int64 `json:"mimic_whatsapp_total"`
 }
 
 type mimicCodeAgg struct {
@@ -160,6 +166,29 @@ returning id
 	var okCount, failCount int64
 	authHeader := strings.TrimSpace(r.Header.Get("Authorization"))
 	var emailAgg, waAgg mimicCodeAgg
+	var serverPeakGoroutines int64 = int64(runtime.NumGoroutine())
+	var sampleWG sync.WaitGroup
+	doneSampling := make(chan struct{})
+	sampleWG.Add(1)
+	go func() {
+		defer sampleWG.Done()
+		ticker := time.NewTicker(5 * time.Millisecond)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				current := int64(runtime.NumGoroutine())
+				for {
+					peak := atomic.LoadInt64(&serverPeakGoroutines)
+					if current <= peak || atomic.CompareAndSwapInt64(&serverPeakGoroutines, peak, current) {
+						break
+					}
+				}
+			case <-doneSampling:
+				return
+			}
+		}
+	}()
 
 	var wg sync.WaitGroup
 	for i, sid := range slotIDs {
@@ -204,7 +233,7 @@ returning id
 			}
 
 			// After DB commit: parallel mimic “email” + “WhatsApp” HTTP calls (same API process).
-			if a.MimicHTTPClient != nil && strings.TrimSpace(a.MimicBaseURL) != "" && authHeader != "" {
+			if a.MimicHTTPClient != nil && strings.TrimSpace(a.MimicBaseURL) != "" {
 				var inner sync.WaitGroup
 				inner.Add(2)
 				go func() {
@@ -232,6 +261,8 @@ returning id
 		}(i, sid)
 	}
 	wg.Wait()
+	close(doneSampling)
+	sampleWG.Wait()
 	phaseMs = float64(time.Since(t1).Microseconds()) / 1000.0
 
 	t2 := time.Now()
@@ -246,11 +277,29 @@ returning id
 
 	totalMs := float64(time.Since(t0).Microseconds()) / 1000.0
 
+	emailByCode := emailAgg.snapshot()
+	waByCode := waAgg.snapshot()
+	var emailTotal, waTotal int64
+	for _, v := range emailByCode {
+		emailTotal += v
+	}
+	for _, v := range waByCode {
+		waTotal += v
+	}
+	mimicDispatchEnabled := a.MimicHTTPClient != nil && strings.TrimSpace(a.MimicBaseURL) != ""
+	mimicAuthHeaderPresent := authHeader != ""
+
 	note := "Goroutines are cheap, but Postgres connections are not: pgxpool keeps a bounded pool (see db_max_conns). " +
 		"Each simulated booking calls Pool.BeginTx, which Acquire()s a connection from the pool; if every connection is busy, extra goroutines block until Commit/Rollback returns a conn. " +
 		"So N goroutines does not mean N simultaneous DB sessions — at most MaxConns transactions run at once; the rest queue in the pool. " +
 		"Behind that, Supabase’s pooler has its own client/backend limits; size DB_MAX_CONNS to your tier. " +
 		"After each successful commit, the benchmark POSTs to /api/v1/mimic/notification/email and /whatsapp (demo providers); Grafana charts booking_mimic_email_notifications_total and booking_mimic_whatsapp_notifications_total by HTTP status code."
+	if !mimicDispatchEnabled {
+		note += " Mimic dispatch was disabled in this run (missing MimicBaseURL or HTTP client)."
+	}
+	if !mimicAuthHeaderPresent {
+		note += " Benchmark request did not include Authorization header for loopback mimic calls."
+	}
 
 	benchmarkSuccess = true
 	writeJSON(w, http.StatusOK, BenchmarkBookingRushResponse{
@@ -262,11 +311,16 @@ returning id
 		TotalMs:           totalMs,
 		ReservationsOK:    okCount,
 		ReservationsFail:  failCount,
+		ServerPeakGoroutines: atomic.LoadInt64(&serverPeakGoroutines),
 		DBMaxConns:        a.Pool.Config().MaxConns,
 		AllowedMaxN:       allowed,
 		Note:              note,
-		MimicEmailByCode:    emailAgg.snapshot(),
-		MimicWhatsAppByCode: waAgg.snapshot(),
+		MimicEmailByCode:    emailByCode,
+		MimicWhatsAppByCode: waByCode,
+		MimicDispatchEnabled: mimicDispatchEnabled,
+		MimicAuthHeaderPresent: mimicAuthHeaderPresent,
+		MimicEmailTotal: emailTotal,
+		MimicWhatsAppTotal: waTotal,
 	})
 }
 
