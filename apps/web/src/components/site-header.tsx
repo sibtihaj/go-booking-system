@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
+import { ObservabilityNavBarGroup } from "@/components/observability-nav-buttons";
 import { Calendar, LogIn, BookOpen, UserPlus } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -25,7 +26,7 @@ export function SiteHeader({
       </Link>
       <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
         <Link
-          href="/how-it-works"
+          href="/application-architecture"
           className={buttonVariants({
             variant: "ghost",
             className:
@@ -33,8 +34,9 @@ export function SiteHeader({
           })}
         >
           <BookOpen className="h-4 w-4" />
-          How it works
+          Application Architecture
         </Link>
+        <ObservabilityNavBarGroup />
         <Link
           href="/signup"
           className={buttonVariants({

@@ -44,6 +44,18 @@ func (a *API) BenchmarkBookingRush(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var benchmarkSuccess bool
+	defer func() {
+		if a.Metrics == nil {
+			return
+		}
+		if benchmarkSuccess {
+			a.Metrics.IncBenchmarkRun("success")
+		} else {
+			a.Metrics.IncBenchmarkRun("failed")
+		}
+	}()
+
 	userID, ok := auth.UserID(r.Context())
 	if !ok {
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
@@ -155,6 +167,7 @@ returning id
 		"So N goroutines does not mean N simultaneous DB sessions — at most MaxConns transactions run at once; the rest queue in the pool. " +
 		"Behind that, Supabase’s pooler has its own client/backend limits; size DB_MAX_CONNS to your tier."
 
+	benchmarkSuccess = true
 	writeJSON(w, http.StatusOK, BenchmarkBookingRushResponse{
 		N:                 n,
 		ResourceID:        body.ResourceID.String(),

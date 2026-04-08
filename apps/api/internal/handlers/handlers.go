@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/go-booking-system/api/internal/auth"
+	"github.com/go-booking-system/api/internal/obsmetrics"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -33,6 +34,8 @@ type API struct {
 	// BenchmarkHardMaxN is the upper bound when the benchmark key is valid (default 10000).
 	BenchmarkHardMaxN int
 	BenchmarkSecret   string
+	// Metrics is optional Prometheus instrumentation (nil disables increments).
+	Metrics *obsmetrics.Metrics
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
@@ -181,12 +184,14 @@ func (a *API) CreateReservation(w http.ResponseWriter, r *http.Request) {
 
 	var body CreateReservationRequest
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.SlotID == uuid.Nil {
+		a.Metrics.IncReservation("invalid_body")
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_body"})
 		return
 	}
 
 	tx, err := a.Pool.BeginTx(r.Context(), pgx.TxOptions{})
 	if err != nil {
+		a.Metrics.IncReservation("error")
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "tx_begin_failed"})
 		return
 	}
@@ -195,22 +200,27 @@ func (a *API) CreateReservation(w http.ResponseWriter, r *http.Request) {
 	reservationID, err := ReserveConfirmedSlot(r.Context(), tx, userID, body.SlotID)
 	if err != nil {
 		if errors.Is(err, ErrSlotNotFound) {
+			a.Metrics.IncReservation("not_found")
 			writeJSON(w, http.StatusNotFound, map[string]string{"error": "slot_not_found"})
 			return
 		}
 		if errors.Is(err, ErrReservationConflict) {
+			a.Metrics.IncReservation("conflict")
 			writeJSON(w, http.StatusConflict, map[string]string{"error": "slot_unavailable"})
 			return
 		}
+		a.Metrics.IncReservation("error")
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "reservation_failed"})
 		return
 	}
 
 	if err := tx.Commit(r.Context()); err != nil {
+		a.Metrics.IncReservation("error")
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "tx_commit_failed"})
 		return
 	}
 
+	a.Metrics.IncReservation("created")
 	writeJSON(w, http.StatusCreated, ReservationResponse{
 		ID:     reservationID,
 		SlotID: body.SlotID,

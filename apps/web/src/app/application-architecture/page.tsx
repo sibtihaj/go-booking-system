@@ -11,14 +11,14 @@ import {
   apiEndpointsTable,
   databaseConstraintsBullets,
   deployBullets,
-  howItWorksAllSections,
-  howItWorksIntro,
+  applicationArchitectureAllSections,
+  applicationArchitectureIntro,
 } from "@/content/showcase";
 import { buttonVariants } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { ArchitectureDiagram } from "@/components/architecture/architecture-diagram";
 
-export default function HowItWorksPage() {
+export default function ApplicationArchitecturePage() {
   const { resolvedTheme } = useTheme();
 
   return (
@@ -29,7 +29,7 @@ export default function HowItWorksPage() {
       <main className="mx-auto max-w-4xl space-y-10 px-6 py-10 pb-20">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <h1 className="text-3xl font-bold tracking-tight text-emerald-950 dark:text-white md:text-4xl">
-            How it works
+            Application Architecture
           </h1>
           <Link
             href="/"
@@ -41,7 +41,7 @@ export default function HowItWorksPage() {
 
         <Card className="border-emerald-500/10 bg-white/70 backdrop-blur-md dark:bg-white/[0.04]">
           <CardContent className="pt-6">
-            <ShowcaseSectionContent section={howItWorksIntro} />
+            <ShowcaseSectionContent section={applicationArchitectureIntro} />
           </CardContent>
         </Card>
 
@@ -165,7 +165,7 @@ export default function HowItWorksPage() {
         <ShowcaseAccordion
           title="Deep dive by topic"
           description="Expand each section for file pointers, HTTP details, and snippets tied to this repository."
-          sections={howItWorksAllSections}
+          sections={applicationArchitectureAllSections}
           defaultOpenIds={["stack", "supabase-session", "load-availability"]}
         />
       </main>

@@ -190,10 +190,10 @@ function SignupForm() {
                 Return to home
               </Link>
               <Link
-                href="/how-it-works"
+                href="/application-architecture"
                 className="text-sm font-medium text-emerald-700 underline underline-offset-4 hover:text-emerald-600 dark:text-emerald-400"
               >
-                How auth works →
+                Application architecture →
               </Link>
             </div>
           </form>

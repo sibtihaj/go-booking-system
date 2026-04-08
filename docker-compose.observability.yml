@@ -1,0 +1,40 @@
+# Prometheus + Grafana for local observability. Run the Go API on the host first:
+#   cd apps/api && go run ./cmd/server
+# Then:
+#   docker compose -f docker-compose.observability.yml up
+#
+# Open Grafana: http://localhost:3002 (admin / admin) — dashboard "Go Booking API" is provisioned.
+# Host port 3002 avoids typical Next.js ports (:3000, :3001). Change the mapping below if 3002 is taken.
+# Prometheus UI: http://localhost:9090
+#
+# Scrape target is host.docker.internal:8080 (API /metrics). On Linux, host.docker.internal
+# is provided via extra_hosts below.
+
+services:
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.enable-lifecycle"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    ports:
+      - "3002:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SERVER_ROOT_URL: http://localhost:3002
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus

@@ -26,7 +26,7 @@ const PORTFOLIO_URL = "https://syedibtihaj.com";
 
 const exploreLinks = [
   { href: "/", label: "Home" },
-  { href: "/how-it-works", label: "How it works" },
+  { href: "/application-architecture", label: "Application Architecture" },
   { href: "/book", label: "Book" },
   { href: "/login", label: "Sign in" },
 ] as const;

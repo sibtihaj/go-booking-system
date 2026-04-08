@@ -353,8 +353,8 @@ export const bookShowcaseSections: ShowcaseSection[] = [
   },
 ];
 
-/** Full /how-it-works page: extended sections + API table */
-export const howItWorksIntro: ShowcaseSection = {
+/** Full /application-architecture page: extended sections + API table */
+export const applicationArchitectureIntro: ShowcaseSection = {
   id: "intro",
   badge: "Architecture",
   title: "How IB Scheduling is wired",
@@ -439,8 +439,8 @@ export const deployBullets = [
   "See DEPLOY.md at repo root for Supabase redirect URLs and local dev commands.",
 ];
 
-/** All educational sections for the /how-it-works page (accordion). */
-export const howItWorksAllSections: ShowcaseSection[] = [
+/** All educational sections for the /application-architecture page (accordion). */
+export const applicationArchitectureAllSections: ShowcaseSection[] = [
   ...homeShowcaseSections,
   ...loginShowcaseSections,
   ...bookShowcaseSections,

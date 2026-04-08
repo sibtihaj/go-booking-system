@@ -15,6 +15,7 @@ import (
 	"github.com/go-booking-system/api/internal/config"
 	"github.com/go-booking-system/api/internal/db"
 	"github.com/go-booking-system/api/internal/handlers"
+	"github.com/go-booking-system/api/internal/obsmetrics"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
@@ -74,18 +75,27 @@ func main() {
 		os.Exit(1)
 	}
 
+	var om *obsmetrics.Metrics
+	if strings.TrimSpace(os.Getenv("ENABLE_PROMETHEUS_METRICS")) != "false" {
+		om = obsmetrics.New(pool)
+	}
+
 	api := &handlers.API{
 		Pool:              pool,
 		SlotCreateSecret:  strings.TrimSpace(os.Getenv("SLOT_CREATE_SECRET")),
 		BenchmarkMaxN:     cfg.BenchmarkMaxN,
 		BenchmarkHardMaxN: cfg.BenchmarkHardMaxN,
 		BenchmarkSecret:   cfg.BenchmarkSecret,
+		Metrics:           om,
 	}
 
 	r := chi.NewRouter()
 	r.Use(middleware.RealIP)
 	r.Use(middleware.RequestID)
 	r.Use(middleware.Recoverer)
+	if om != nil {
+		r.Use(om.HTTPMiddleware())
+	}
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   cfg.CORSAllowedOrigins,
 		AllowedMethods:   []string{"GET", "POST", "OPTIONS"},
@@ -95,6 +105,9 @@ func main() {
 	}))
 
 	r.Get("/health", api.Health)
+	if om != nil {
+		r.Handle("/metrics", om.Handler())
+	}
 
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Group(func(r chi.Router) {

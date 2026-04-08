@@ -114,12 +114,12 @@ export default function Home() {
               description={
                 <>
                   Portfolio-oriented breakdown with real paths in this repo. Full walkthrough:{" "}
-                  <Link href="/how-it-works" className="font-medium text-emerald-700 underline underline-offset-4 hover:text-emerald-600 dark:text-emerald-400">
-                    How it works
+                  <Link href="/application-architecture" className="font-medium text-emerald-700 underline underline-offset-4 hover:text-emerald-600 dark:text-emerald-400">
+                    Application Architecture
                   </Link>{" "}
                   (includes a{" "}
                   <Link
-                    href="/how-it-works#system-architecture"
+                    href="/application-architecture#system-architecture"
                     className="font-medium text-emerald-700 underline underline-offset-4 hover:text-emerald-600 dark:text-emerald-400"
                   >
                     live architecture diagram

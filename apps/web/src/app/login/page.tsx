@@ -127,8 +127,8 @@ function LoginForm() {
                 <ArrowLeft className="mr-2 h-4 w-4 transition-transform group-hover:-translate-x-1" />
                 Return to home
               </Link>
-              <Link href="/how-it-works" className="text-sm font-medium text-emerald-700 underline underline-offset-4 hover:text-emerald-600 dark:text-emerald-400">
-                How auth works →
+              <Link href="/application-architecture" className="text-sm font-medium text-emerald-700 underline underline-offset-4 hover:text-emerald-600 dark:text-emerald-400">
+                Application architecture →
               </Link>
             </div>
           </form>

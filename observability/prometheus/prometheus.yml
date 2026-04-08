@@ -1,0 +1,15 @@
+# Scrape the Go API (run locally: go run ./cmd/server from apps/api).
+# With Docker Compose: Prometheus reaches the API on the host via host.docker.internal:8080
+# (Linux: ensure extra_hosts in compose includes host-gateway).
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: booking-api
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - host.docker.internal:8080
+        labels:
+          service: booking-api

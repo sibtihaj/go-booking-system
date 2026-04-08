@@ -18,6 +18,7 @@ import {
 import { ShowcaseAccordion } from "@/components/showcase/showcase-accordion";
 import { bookShowcaseSections } from "@/content/showcase";
 import { BookingConcurrencyLab } from "@/components/booking/booking-concurrency-lab";
+import { ObservabilityLinks } from "@/components/booking/observability-links";
 import { cn } from "@/lib/utils";
 
 type Slot = {
@@ -309,10 +310,10 @@ export default function BookPage() {
               <Home className="mr-2 h-3.5 w-3.5" /> Home
             </Link>
             <Link
-              href="/how-it-works"
+              href="/application-architecture"
               className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "rounded-full text-xs font-medium px-4")}
             >
-              <BookOpen className="mr-2 h-3.5 w-3.5" /> How it works
+              <BookOpen className="mr-2 h-3.5 w-3.5" /> Application Architecture
             </Link>
             <div className="h-4 w-px bg-emerald-500/10" />
             <Button variant="outline" size="sm" className="rounded-full text-xs font-semibold px-5 border-emerald-500/10 hover:bg-emerald-500/5" onClick={() => void signOut()}>
@@ -320,6 +321,8 @@ export default function BookPage() {
             </Button>
           </motion.div>
         </header>
+
+        <ObservabilityLinks />
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
           {/* Main Content Area */}
@@ -506,10 +509,10 @@ export default function BookPage() {
                 </ul>
 
                 <Link 
-                  href="/how-it-works"
+                  href="/application-architecture"
                   className="group/btn inline-flex items-center gap-2 text-sm font-bold text-emerald-400 hover:text-emerald-300 transition-colors"
                 >
-                  Learn about the architecture
+                  Application Architecture
                   <ChevronRight className="h-4 w-4 transition-transform group-hover/btn:translate-x-1" />
                 </Link>
               </div>
