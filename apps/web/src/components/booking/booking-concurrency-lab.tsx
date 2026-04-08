@@ -537,6 +537,10 @@ export function BookingConcurrencyLab({
             <p className="mb-2 text-xs uppercase tracking-wider text-muted-foreground">
               Observability shortcuts (open in new tabs)
             </p>
+            <p className="mb-3 text-xs text-muted-foreground">
+              Grafana login (demo): <span className="font-mono font-semibold text-foreground">admin</span> /{" "}
+              <span className="font-mono font-semibold text-foreground">admin</span>
+            </p>
             <div className="flex flex-wrap gap-2">
               <ObservabilityNavButtons variant="card" />
             </div>
