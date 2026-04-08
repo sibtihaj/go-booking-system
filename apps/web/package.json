@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "api": "cd ../api && go run ./cmd/server",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"

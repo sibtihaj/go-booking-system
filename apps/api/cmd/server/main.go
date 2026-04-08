@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -16,9 +17,40 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
+	"github.com/joho/godotenv"
 )
 
+// loadDotEnv finds .env by walking up from the working directory. That way it works when you run
+// `go run .` or `go run main.go` from apps/api/cmd/server, from apps/api, or from the monorepo root.
+func loadDotEnv() {
+	wd, err := os.Getwd()
+	if err != nil {
+		return
+	}
+	dir := wd
+	for {
+		candidates := []string{
+			filepath.Join(dir, ".env"),
+			filepath.Join(dir, "apps", "api", ".env"),
+		}
+		for _, p := range candidates {
+			if _, err := os.Stat(p); err != nil {
+				continue
+			}
+			_ = godotenv.Load(p)
+			return
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
+	}
+}
+
 func main() {
+	loadDotEnv()
+
 	ctx := context.Background()
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 
