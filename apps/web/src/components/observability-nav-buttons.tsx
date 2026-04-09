@@ -9,6 +9,12 @@ export function showObservabilityNav(): boolean {
   return process.env.NEXT_PUBLIC_SHOW_OBSERVABILITY_NAV !== "false";
 }
 
+function trimUrl(value: string | undefined): string | undefined {
+  const v = value?.trim();
+  if (!v) return undefined;
+  return v;
+}
+
 const navLinkClass = cn(
   buttonVariants({
     variant: "ghost",
@@ -52,11 +58,16 @@ export function ObservabilityNavButtons({ variant }: ObservabilityNavButtonsProp
   }
 
   const linkClass = variant === "navbar" ? navLinkClass : cardLinkClass;
+  const grafanaHref = trimUrl(process.env.NEXT_PUBLIC_OBSERVABILITY_GRAFANA_URL) ?? "/grafana-dashboard";
+  const prometheusHref =
+    trimUrl(process.env.NEXT_PUBLIC_OBSERVABILITY_PROMETHEUS_URL) ?? "/prometheus-dashboard";
+  const apiMetricsHref =
+    trimUrl(process.env.NEXT_PUBLIC_OBSERVABILITY_API_METRICS_URL) ?? "/booking-api-metrics";
 
   return (
     <>
       <Link
-        href="/grafana-dashboard"
+        href={grafanaHref}
         target="_blank"
         rel="noopener noreferrer"
         className={linkClass}
@@ -67,7 +78,7 @@ export function ObservabilityNavButtons({ variant }: ObservabilityNavButtonsProp
         <ExternalLink className="h-3 w-3 shrink-0 opacity-60 sm:h-3.5 sm:w-3.5" aria-hidden />
       </Link>
       <Link
-        href="/prometheus-dashboard"
+        href={prometheusHref}
         target="_blank"
         rel="noopener noreferrer"
         className={linkClass}
@@ -79,7 +90,7 @@ export function ObservabilityNavButtons({ variant }: ObservabilityNavButtonsProp
         <ExternalLink className="h-3 w-3 shrink-0 opacity-60 sm:h-3.5 sm:w-3.5" aria-hidden />
       </Link>
       <Link
-        href="/booking-api-metrics"
+        href={apiMetricsHref}
         target="_blank"
         rel="noopener noreferrer"
         className={linkClass}

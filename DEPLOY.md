@@ -30,15 +30,29 @@ A small observability stack ships in the repo under `[observability/](observabil
 
 If the Prometheus container restarts with `queries.active: permission denied`, deploy with the Dockerfile in `observability/railway/prometheus` (it sets `--storage.tsdb.path=/tmp/prometheus` to avoid permission issues from attached Railway volumes).
 
-### Same hostname on Vercel (optional)
+### Observability links from the app (recommended)
 
-The Next.js app can **proxy** paths to Grafana, Prometheus, and the raw metrics endpoint using **`rewrites`** in `[apps/web/next.config.ts](apps/web/next.config.ts)`. Set these in the Vercel project (and optionally in `.env.local` for local `next dev`):
+For production reliability, point UI buttons directly to hosted observability URLs:
 
 | Variable | Purpose |
 |----------|---------|
-| `OBSERVABILITY_GRAFANA_ORIGIN` | Origin of the Grafana service (no path), e.g. `https://grafana-xxx.up.railway.app` |
-| `OBSERVABILITY_PROMETHEUS_ORIGIN` | Origin of Prometheus, e.g. `https://prometheus-xxx.up.railway.app` |
-| `OBSERVABILITY_API_METRICS_ORIGIN` | Origin of the Go API for `/metrics` (optional; defaults to `NEXT_PUBLIC_API_URL`) |
+| `NEXT_PUBLIC_OBSERVABILITY_GRAFANA_URL` | Direct Grafana URL, e.g. `https://grafana-xxx.up.railway.app` |
+| `NEXT_PUBLIC_OBSERVABILITY_PROMETHEUS_URL` | Direct Prometheus URL, e.g. `https://prometheus-xxx.up.railway.app` |
+| `NEXT_PUBLIC_OBSERVABILITY_API_METRICS_URL` | Direct metrics URL, e.g. `https://go-api-xxx.up.railway.app/metrics` |
+
+If these are set, site nav/buttons open those direct URLs in new tabs.
+
+### Same hostname on Vercel via rewrites (optional)
+
+The Next.js app can also **proxy** Grafana, Prometheus, and the raw metrics endpoint using **`rewrites`** in `[apps/web/next.config.ts](apps/web/next.config.ts)`. At build time it uses `OBSERVABILITY_*_ORIGIN` **if set**; otherwise it derives origins from the same **`NEXT_PUBLIC_OBSERVABILITY_*_URL`** values as the nav buttons, so you do not need duplicate variables for the same Railway URLs.
+
+If you prefer to override rewrites without changing the public URLs, set these (and optionally in `.env.local` for local `next dev`):
+
+| Variable | Purpose |
+|----------|---------|
+| `OBSERVABILITY_GRAFANA_ORIGIN` | Origin of Grafana (no path); optional if `NEXT_PUBLIC_OBSERVABILITY_GRAFANA_URL` is set |
+| `OBSERVABILITY_PROMETHEUS_ORIGIN` | Origin of Prometheus; optional if `NEXT_PUBLIC_OBSERVABILITY_PROMETHEUS_URL` is set |
+| `OBSERVABILITY_API_METRICS_ORIGIN` | Go API origin for `/metrics`; optional if `NEXT_PUBLIC_OBSERVABILITY_API_METRICS_URL` or `NEXT_PUBLIC_API_URL` is set |
 
 Public routes on the frontend (after deploy):
 
@@ -50,4 +64,4 @@ Grafana must believe its public URL is the Vercel path, not only the Railway URL
 
 Prometheus and Grafana remain **separate deployments** (for example on Railway); Vercel does not run those processes. The rewrites only forward browser requests. Exposing `/booking-api-metrics` on a public domain duplicates sensitive operational data outside the API host—treat it like any other production metrics endpoint.
 
-The **site header** and the **Book a slot** page include links for these paths when **`NEXT_PUBLIC_SHOW_OBSERVABILITY_NAV`** is not set to `false` (default: visible). They open in new browser tabs so users can keep the app open.
+The **site header** and the **Book a slot** page include observability links when **`NEXT_PUBLIC_SHOW_OBSERVABILITY_NAV`** is not set to `false` (default: visible). They open in new browser tabs so users can keep the app open.

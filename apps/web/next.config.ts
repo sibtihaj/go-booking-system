@@ -3,14 +3,12 @@ import type { NextConfig } from "next";
 /**
  * Observability reverse-proxy paths (Vercel rewrites → external origins).
  *
- * - /grafana-dashboard → OBSERVABILITY_GRAFANA_ORIGIN with path /grafana-dashboard/...
- *   Grafana must be configured with GF_SERVER_ROOT_URL=https://<your-vercel-domain>/grafana-dashboard
- *   and GF_SERVER_SERVE_FROM_SUB_PATH=true so it serves under that path on the upstream host.
+ * Origins are read from OBSERVABILITY_*_ORIGIN if set, otherwise from NEXT_PUBLIC_OBSERVABILITY_*_URL
+ * so you only need one set of Vercel env vars (the NEXT_PUBLIC URLs used by the nav buttons).
  *
- * - /prometheus-dashboard → OBSERVABILITY_PROMETHEUS_ORIGIN (Prometheus UI is usually at /graph).
- *
- * - /booking-api-metrics → Go API GET /metrics (raw Prometheus text). Prefer network restrictions
- *   or auth in production; this exposes operational detail on your public app domain when enabled.
+ * - /grafana-dashboard → Grafana origin with path /grafana-dashboard/...
+ * - /prometheus-dashboard → Prometheus origin (UI often at /graph).
+ * - /booking-api-metrics → Go API GET /metrics (optional exposure on your app domain).
  */
 function trimOrigin(value: string | undefined): string | undefined {
   const t = value?.trim();
@@ -18,10 +16,27 @@ function trimOrigin(value: string | undefined): string | undefined {
   return t.replace(/\/$/, "");
 }
 
-const grafanaOrigin = trimOrigin(process.env.OBSERVABILITY_GRAFANA_ORIGIN);
-const prometheusOrigin = trimOrigin(process.env.OBSERVABILITY_PROMETHEUS_ORIGIN);
+/** Strip path from a full URL (e.g. .../metrics → origin) for rewrite targets. */
+function originFromUrl(value: string | undefined): string | undefined {
+  const t = trimOrigin(value);
+  if (!t) return undefined;
+  try {
+    const u = new URL(t);
+    return `${u.protocol}//${u.host}`;
+  } catch {
+    return t;
+  }
+}
+
+const grafanaOrigin =
+  trimOrigin(process.env.OBSERVABILITY_GRAFANA_ORIGIN) ??
+  trimOrigin(process.env.NEXT_PUBLIC_OBSERVABILITY_GRAFANA_URL);
+const prometheusOrigin =
+  trimOrigin(process.env.OBSERVABILITY_PROMETHEUS_ORIGIN) ??
+  trimOrigin(process.env.NEXT_PUBLIC_OBSERVABILITY_PROMETHEUS_URL);
 const apiMetricsOrigin =
-  trimOrigin(process.env.OBSERVABILITY_API_METRICS_ORIGIN) ??
+  originFromUrl(process.env.OBSERVABILITY_API_METRICS_ORIGIN) ??
+  originFromUrl(process.env.NEXT_PUBLIC_OBSERVABILITY_API_METRICS_URL) ??
   trimOrigin(process.env.NEXT_PUBLIC_API_URL);
 
 const GRAFANA_SUBPATH = "/grafana-dashboard";
